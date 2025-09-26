@@ -1,0 +1,51 @@
+# Kotlin/Android/KMM ignore
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# Gradle
+.gradle/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+!gradlew
+!gradlew.bat
+
+# Android
+local.properties
+captures/
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+*.log
+
+# Keystores & signing
+**/*.jks
+**/*.keystore
+**/keystore.properties
+**/key.properties
+**/*.pem
+**/*.p12
+
+# KMM/Native (future iOS)
+**/xcuserdata/
+**/DerivedData/
+Pods/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Env/Secrets (if any)
+.env
+.env.*
+
+# Reports
+**/reports/
+**/test-results/
+**/outputs/
