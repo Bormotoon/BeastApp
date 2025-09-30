@@ -5,10 +5,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import androidx.hilt.work.HiltWorker
 import androidx.work.*
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
 
 private const val CHANNEL_ID = "beast_reminders"
@@ -45,10 +42,9 @@ class ReminderSchedulerImpl(
     }
 }
 
-@HiltWorker
-class ReminderWorker @AssistedInject constructor(
-    @Assisted appContext: Context,
-    @Assisted params: WorkerParameters,
+class ReminderWorker(
+    appContext: Context,
+    params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         val title = inputData.getString("title") ?: "Workout Reminder"
@@ -64,4 +60,3 @@ class ReminderWorker @AssistedInject constructor(
         return Result.success()
     }
 }
-

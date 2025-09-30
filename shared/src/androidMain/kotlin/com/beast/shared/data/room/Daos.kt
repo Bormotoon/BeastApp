@@ -4,7 +4,6 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.Transaction
 
 @Dao
 interface ProgramDao {
@@ -69,3 +68,26 @@ interface SetLogDao {
     suspend fun upsertAll(entities: List<SetLogEntity>)
 }
 
+@Dao
+interface MeasurementDao {
+    @Query("SELECT * FROM measurements ORDER BY date DESC")
+    suspend fun getAll(): List<MeasurementEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: MeasurementEntity)
+
+    @Query("DELETE FROM measurements WHERE id = :id")
+    suspend fun delete(id: String)
+}
+
+@Dao
+interface PhotoProgressDao {
+    @Query("SELECT * FROM photos_progress ORDER BY date DESC")
+    suspend fun getAll(): List<PhotoProgressEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: PhotoProgressEntity)
+
+    @Query("DELETE FROM photos_progress WHERE id = :id")
+    suspend fun delete(id: String)
+}

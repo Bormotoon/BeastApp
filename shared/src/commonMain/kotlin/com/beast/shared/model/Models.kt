@@ -51,3 +51,19 @@ data class WorkoutLog(
     val notes: String? = null,
 )
 
+data class Measurement(
+    val id: String,
+    val date: Long,
+    val weight: Double?,
+    val chest: Double? = null,
+    val waist: Double? = null,
+    val hips: Double? = null,
+    val additionalFields: Map<String, Double?> = emptyMap(),
+)
+
+data class PhotoProgress(
+    val id: String,
+    val date: Long,
+    val angle: String, // front/side/back/other
+    val fileUri: String,
+)

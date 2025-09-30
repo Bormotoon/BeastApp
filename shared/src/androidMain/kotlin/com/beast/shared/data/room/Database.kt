@@ -13,8 +13,10 @@ import androidx.room.TypeConverters
         ExerciseEntity::class,
         WorkoutLogEntity::class,
         SetLogEntity::class,
+        MeasurementEntity::class,
+        PhotoProgressEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(ListConverters::class)
@@ -24,6 +26,8 @@ abstract class FitDatabase : RoomDatabase() {
     abstract fun exerciseDao(): ExerciseDao
     abstract fun workoutLogDao(): WorkoutLogDao
     abstract fun setLogDao(): SetLogDao
+    abstract fun measurementDao(): MeasurementDao
+    abstract fun photoProgressDao(): PhotoProgressDao
 }
 
 class DatabaseFactory(private val context: Context) {
@@ -35,4 +39,3 @@ class DatabaseFactory(private val context: Context) {
      .fallbackToDestructiveMigration()
      .build()
 }
-

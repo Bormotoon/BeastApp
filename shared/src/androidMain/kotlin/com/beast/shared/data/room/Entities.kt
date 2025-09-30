@@ -59,3 +59,21 @@ data class SetLogEntity(
     val timestamp: Long,
 )
 
+@Entity(tableName = "measurements")
+data class MeasurementEntity(
+    @PrimaryKey val id: String,
+    val date: Long,
+    val weight: Double?,
+    val chest: Double?,
+    val waist: Double?,
+    val hips: Double?,
+    val additionalJson: String,
+)
+
+@Entity(tableName = "photos_progress")
+data class PhotoProgressEntity(
+    @PrimaryKey val id: String,
+    val date: Long,
+    val angle: String,
+    val fileUri: String,
+)

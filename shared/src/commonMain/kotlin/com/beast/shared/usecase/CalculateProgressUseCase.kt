@@ -1,3 +1,7 @@
+package com.beast.shared.usecase
+
+import com.beast.shared.repository.WorkoutLogRepository
+
 class CalculateProgressUseCase(private val logsRepo: WorkoutLogRepository) {
     data class Result(val completedDays: Int, val totalDays: Int, val percent: Int)
 
@@ -8,8 +12,3 @@ class CalculateProgressUseCase(private val logsRepo: WorkoutLogRepository) {
         return Result(completed, totalDays, percent.coerceIn(0, 100))
     }
 }
-package com.beast.shared.usecase
-
-import com.beast.shared.repository.WorkoutLogRepository
-
-

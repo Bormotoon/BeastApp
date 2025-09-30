@@ -4,7 +4,8 @@ plugins {
     alias(libs.plugins.kotlinAndroid)
     alias(libs.plugins.hilt)
     alias(libs.plugins.composeCompiler)
-    kotlin("kapt")
+    // Use kapt without explicit version to avoid classpath version conflict
+    id("org.jetbrains.kotlin.kapt")
     alias(libs.plugins.ksp)
 }
 
@@ -29,16 +30,18 @@ android {
                 "proguard-rules.pro"
             )
         }
-        debug {
-            isMinifyEnabled = false
-        }
+        debug { isMinifyEnabled = false }
     }
 
     buildFeatures { compose = true }
 
-    packaging {
-        resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
+
+    packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
 
     kotlinOptions { jvmTarget = "17" }
 }
@@ -63,4 +66,11 @@ dependencies {
     implementation(libs.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)
     kapt(libs.androidx.hilt.compiler)
+
+    // Core library desugaring for java.time
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
+
+    implementation(libs.material)
+    implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.compose.ui.text)
 }

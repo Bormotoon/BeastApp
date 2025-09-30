@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.BeastApp" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="android:statusBarColor">?attr/colorPrimaryDark</item>
+    <style name="Theme.BeastApp" parent="Theme.Material3.DayNight">
+        <!-- Compose-активити не использует ActionBar; статус-баром управим через System UI Controller при необходимости -->
+        <!-- Удалён устаревший colorPrimaryDark -->
     </style>
 </resources>
-

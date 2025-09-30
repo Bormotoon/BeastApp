@@ -3,6 +3,9 @@ package com.beast.shared.data.room
 import com.beast.shared.model.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.builtins.nullable
 
 private val json = Json
 
@@ -48,3 +51,27 @@ fun WorkoutLog.toEntity(): WorkoutLogEntity = WorkoutLogEntity(id, programId, da
 fun SetLogEntity.toModel(): SetLog = SetLog(id, workoutDayId, exerciseId, setIndex, reps, weight, rpe, timestamp)
 fun SetLog.toEntity(): SetLogEntity = SetLogEntity(id, workoutDayId, exerciseId, setIndex, reps, weight, rpe, timestamp)
 
+private val mapSer = MapSerializer(String.serializer(), Double.serializer().nullable)
+
+fun MeasurementEntity.toModel(): Measurement = Measurement(
+    id = id,
+    date = date,
+    weight = weight,
+    chest = chest,
+    waist = waist,
+    hips = hips,
+    additionalFields = json.decodeFromString(mapSer, additionalJson)
+)
+
+fun Measurement.toEntity(): MeasurementEntity = MeasurementEntity(
+    id = id,
+    date = date,
+    weight = weight,
+    chest = chest,
+    waist = waist,
+    hips = hips,
+    additionalJson = json.encodeToString(mapSer, additionalFields)
+)
+
+fun PhotoProgressEntity.toModel(): PhotoProgress = PhotoProgress(id, date, angle, fileUri)
+fun PhotoProgress.toEntity(): PhotoProgressEntity = PhotoProgressEntity(id, date, angle, fileUri)

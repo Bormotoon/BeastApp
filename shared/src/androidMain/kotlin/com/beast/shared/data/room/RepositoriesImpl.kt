@@ -44,3 +44,16 @@ class WorkoutLogRepositoryImpl(
     }
 }
 
+class MeasurementRepositoryImpl(private val db: FitDatabase) : MeasurementRepository {
+    private val dao = db.measurementDao()
+    override suspend fun getAll(): List<Measurement> = dao.getAll().map { it.toModel() }
+    override suspend fun upsert(measurement: Measurement) { dao.upsert(measurement.toEntity()) }
+    override suspend fun delete(id: String) { dao.delete(id) }
+}
+
+class PhotoProgressRepositoryImpl(private val db: FitDatabase) : PhotoProgressRepository {
+    private val dao = db.photoProgressDao()
+    override suspend fun getAll(): List<PhotoProgress> = dao.getAll().map { it.toModel() }
+    override suspend fun upsert(photo: PhotoProgress) { dao.upsert(photo.toEntity()) }
+    override suspend fun delete(id: String) { dao.delete(id) }
+}

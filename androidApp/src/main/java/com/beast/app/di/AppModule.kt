@@ -5,6 +5,7 @@ import com.beast.shared.data.room.*
 import com.beast.shared.repository.*
 import com.beast.shared.reminders.ReminderScheduler
 import com.beast.shared.reminders.ReminderSchedulerImpl
+import com.beast.shared.data.prefs.SettingsRepositoryImpl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -38,5 +39,17 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideMeasurementRepository(db: FitDatabase): MeasurementRepository = MeasurementRepositoryImpl(db)
+
+    @Provides
+    @Singleton
+    fun providePhotoProgressRepository(db: FitDatabase): PhotoProgressRepository = PhotoProgressRepositoryImpl(db)
+
+    @Provides
+    @Singleton
     fun provideReminderScheduler(@ApplicationContext context: Context): ReminderScheduler = ReminderSchedulerImpl(context)
+
+    @Provides
+    @Singleton
+    fun provideSettingsRepository(@ApplicationContext context: Context): SettingsRepository = SettingsRepositoryImpl(context)
 }
