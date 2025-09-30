@@ -265,3 +265,13 @@
   Описание: В `shared/build.gradle.kts` Room зависимости переведены на `api` (runtime/ktx) в `androidMain`, чтобы `androidApp` транзитивно видел `androidx.room.RoomDatabase` при компиляции kapt/javac.
   Результат: Должно устранить `class file for androidx.room.RoomDatabase not found` при компиляции `AppModule_ProvideDatabaseFactory.java`.
   Следующие шаги: Сборка `:androidApp:assembleDebug` c JBR.
+
+- [2025-09-30 11:55] ⚠️ issue Крэш на запуске — Room TypeConverter
+  Описание: По logcat выявлен FATAL EXCEPTION: IllegalArgumentException — "Unexpected type converter ... ListConverters@... Annotate TypeConverter class with @ProvidedTypeConverter or remove from builder". В базе стоял `@TypeConverters(ListConverters::class)` при том, что конвертер уже отмечен `@ProvidedTypeConverter` и передаётся через `addTypeConverter(...)` в builder.
+  Результат: Конфликт двойной регистрации конвертера.
+  Следующие шаги: Удалить `@TypeConverters(ListConverters::class)` у `FitDatabase` и пересобрать.
+
+- [2025-09-30 12:00] ✅ done Fix — Room ProvidedTypeConverter
+  Описание: Удалён `@TypeConverters(ListConverters::class)` из `shared/data/room/Database.kt`. Сборка `:androidApp:assembleDebug`, переустановка APK, запуск `MainActivity`.
+  Результат: Запуск успешен, FATAL EXCEPTION отсутствует, приложение открывается на онбординге.
+  Следующие шаги: Мелкие UX-правки и устранение депрекейтов Compose; добавить запрос POST_NOTIFICATIONS на Android 13+.

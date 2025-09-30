@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.TypeConverters
 
 @Database(
     entities = [
@@ -19,7 +18,6 @@ import androidx.room.TypeConverters
     version = 2,
     exportSchema = false
 )
-@TypeConverters(ListConverters::class)
 abstract class FitDatabase : RoomDatabase() {
     abstract fun programDao(): ProgramDao
     abstract fun workoutDayDao(): WorkoutDayDao
