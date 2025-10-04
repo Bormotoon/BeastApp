@@ -75,41 +75,22 @@ fun BeastApp() {
             }
         }
     ) { padding ->
-        val appState: AppStateViewModel = hiltViewModel()
-        val completed by appState.onboardingCompleted.collectAsState(initial = false)
-        LaunchedEffect(completed) {
-            if (completed) {
-                navController.navigate(Route.Dashboard.route) {
-                    popUpTo(Route.Onboarding.route) { inclusive = true }
-                    launchSingleTop = true
-                }
-            }
-        }
 
-        NavHost(
-            navController = navController,
-            startDestination = Route.Onboarding.route,
-            modifier = Modifier.padding(padding)
-        ) {
-            composable(Route.Onboarding.route) {
-                val vm: OnboardingViewModel = hiltViewModel()
-                val programs by vm.programsState.collectAsState()
-                OnboardingScreen(
-                    programs = programs,
-                    onLoad = vm::load,
-                    onContinue = { units, selectedId ->
-                        vm.completeOnboarding(units, selectedId)
-                    }
+        val onboardingCompleted by appState.onboardingCompleted.collectAsState(initial = false)
+        val startDestination = if (onboardingCompleted) Route.Dashboard.route else Route.Onboarding.route
+                            popUpTo(Route.Onboarding.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
+            startDestination = startDestination,
                 )
             }
             composable(Route.Dashboard.route) {
-                DashboardScreen(
-                    onStartWorkout = { programId, dayIndex ->
                         navController.navigate("workout/$programId/$dayIndex")
-                    },
-                    onOpenPrograms = { navController.navigate(Route.Programs.route) }
-                )
-            }
+                    onOnboardingComplete = {
+                        navController.navigate(Route.Dashboard.route) {
+                            popUpTo(Route.Onboarding.route) { inclusive = true }
+                            launchSingleTop = true
+                        }
             composable(Route.Programs.route) { ProgramsScreen(onOpen = { id ->
                 navController.navigate("program/$id")
             }) }

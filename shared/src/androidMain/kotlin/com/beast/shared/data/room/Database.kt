@@ -33,7 +33,7 @@ class DatabaseFactory(private val context: Context) {
         context.applicationContext,
         FitDatabase::class.java,
         "beast_fit.db"
-    ).addTypeConverter(ListConverters())
+    )
      .fallbackToDestructiveMigration()
      .build()
 }
