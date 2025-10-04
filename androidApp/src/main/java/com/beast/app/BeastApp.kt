@@ -45,6 +45,8 @@ sealed class Route(val route: String, val label: String, val icon: ImageVector? 
     data object ProgramDetail : Route("program/{programId}", "Program", null)
     data object WorkoutDetail : Route("workout/{programId}/{dayIndex}", "Workout", null)
     data object ExerciseDetail : Route("exercise/{exerciseId}", "Exercise", null)
+    data object AdvancedSettings : Route("advanced_settings", "Advanced Settings", null)
+    data object ImportProgram : Route("import_program", "Import Program", null)
 }
 
 @Composable
@@ -92,14 +94,21 @@ fun BeastApp() {
                             popUpTo(Route.Onboarding.route) { inclusive = true }
                             launchSingleTop = true
                         }
-            composable(Route.Programs.route) { ProgramsScreen(onOpen = { id ->
-                navController.navigate("program/$id")
-            }) }
+            composable(Route.Programs.route) {
+                ProgramsScreen(
+                    onOpen = { id -> navController.navigate("program/$id") },
+                    onNavigateToImport = { navController.navigate(Route.ImportProgram.route) }
+                )
+            }
             composable(Route.Calendar.route) { CalendarScreenNew(onStartWorkout = { programId, dayIndex ->
                 navController.navigate("workout/$programId/$dayIndex")
             }) }
             composable(Route.Progress.route) { ProgressScreenNew() }
-            composable(Route.Profile.route) { ProfileScreen() }
+            composable(Route.Profile.route) {
+                ProfileScreen(
+                    onNavigateToAdvanced = { navController.navigate(Route.AdvancedSettings.route) }
+                )
+            }
             composable(Route.WorkoutDetail.route) { backStackEntry ->
                 val programId = backStackEntry.arguments?.getString("programId") ?: return@composable
                 val dayIndex = backStackEntry.arguments?.getString("dayIndex")?.toIntOrNull() ?: return@composable
@@ -113,6 +122,16 @@ fun BeastApp() {
                 val exerciseId = backStackEntry.arguments?.getString("exerciseId") ?: return@composable
                 com.beast.app.exercise.ExerciseDetailScreen(
                     exerciseId = exerciseId,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable(Route.AdvancedSettings.route) {
+                com.beast.app.settings.AdvancedSettingsScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable(Route.ImportProgram.route) {
+                com.beast.app.programs.ImportProgramScreen(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
@@ -217,16 +236,34 @@ private fun RecentLogItem(log: com.beast.shared.model.WorkoutLog, onClick: () ->
 }
 
 @Composable
-fun ProgramsScreen(vm: ProgramsViewModel = hiltViewModel(), onOpen: (String) -> Unit = {}) {
+fun ProgramsScreen(
+    vm: ProgramsViewModel = hiltViewModel(),
+    onOpen: (String) -> Unit = {},
+    onNavigateToImport: () -> Unit = {}
+) {
     LaunchedEffect(Unit) { vm.load() }
     val programs by vm.programs.collectAsState()
     val activeId by vm.activeProgramId.collectAsState(initial = null)
-    if (programs.isEmpty()) {
-        EmptyState(
-            title = "Нет программ",
-            subtitle = "Импортируйте 90-дневную программу или создайте свою"
-        )
-    } else {
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Import button at the top
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            Button(onClick = onNavigateToImport) {
+                Text("⬆️ Import Program")
+            }
+        }
+
+        if (programs.isEmpty()) {
+            EmptyState(
+                title = "Нет программ",
+                subtitle = "Импортируйте 90-дневную программу или создайте свою"
+            )
+        } else {
         LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             items(programs) { p ->
                 Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
@@ -250,11 +287,12 @@ fun ProgramsScreen(vm: ProgramsViewModel = hiltViewModel(), onOpen: (String) -> 
                 }
             }
         }
+        }
     }
 }
 
 @Composable
-fun ProfileScreen(app: AppStateViewModel = hiltViewModel()) {
+fun ProfileScreen(app: AppStateViewModel = hiltViewModel(), onNavigateToAdvanced: () -> Unit = {}) {
     val accent by app.accentColor.collectAsState(initial = "#2E7D32")
     var custom by remember(accent) { mutableStateOf(TextFieldValue(accent)) }
     val presets = listOf(
@@ -267,6 +305,24 @@ fun ProfileScreen(app: AppStateViewModel = hiltViewModel()) {
     LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         item { Text("Настройки", style = MaterialTheme.typography.titleLarge) }
         item { Spacer(Modifier.height(12.dp)) }
+
+        // Advanced Settings button
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Button(
+                    onClick = onNavigateToAdvanced,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                ) {
+                    Text("🔧 Advanced Settings")
+                }
+            }
+        }
+        item { Spacer(Modifier.height(16.dp)) }
         item { Text("Акцентный цвет", style = MaterialTheme.typography.titleMedium) }
         item { Spacer(Modifier.height(8.dp)) }
         items(presets) { (hex, name) ->

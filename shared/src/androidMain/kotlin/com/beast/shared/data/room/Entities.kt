@@ -56,6 +56,7 @@ data class SetLogEntity(
     val reps: Int,
     val weight: Double,
     val rpe: Double?,
+    val notes: String?,
     val timestamp: Long,
 )
 

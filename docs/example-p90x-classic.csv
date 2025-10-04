@@ -1,0 +1,23 @@
+# PROGRAM_NAME: P90X Classic
+# DESCRIPTION: Tony Horton's revolutionary 90-day home fitness program
+# AUTHOR: Beachbody
+# DIFFICULTY: Advanced
+# DURATION_DAYS: 90
+# TAGS: Bodybuilding, Cardio, Flexibility
+
+day,title,description,duration,exercises,rest_day
+1,Chest & Back,Push-ups and pull-ups workout,53,bench-press;pull-ups;incline-db-press,false
+2,Plyometrics,Jump training for explosive power,60,,false
+3,Shoulders & Arms,Biceps triceps and shoulders,60,military-press;lateral-raise;barbell-curl;tricep-dips,false
+4,Yoga X,Yoga flexibility and balance,90,,false
+5,Legs & Back,Lower body and back workout,60,squats;deadlift;leg-press;pull-ups,false
+6,Kenpo X,Cardio kickboxing workout,60,,false
+7,Rest or X Stretch,Recovery day,60,,true
+8,Chest Shoulders & Triceps,Upper body push workout,55,bench-press;military-press;tricep-dips;lateral-raise,false
+9,Plyometrics,Jump training for explosive power,60,,false
+10,Back & Biceps,Pull workout,52,deadlift;bent-over-row;pull-ups;barbell-curl;hammer-curl,false
+11,Yoga X,Yoga flexibility and balance,90,,false
+12,Legs & Back,Lower body and back workout,60,squats;deadlift;leg-press;pull-ups,false
+13,Kenpo X,Cardio kickboxing workout,60,,false
+14,Rest or X Stretch,Recovery day,60,,true
+

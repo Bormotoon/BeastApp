@@ -43,6 +43,30 @@ interface SettingsRepository {
     // Новое: дата старта активной программы (UTC millis, начало дня)
     fun activeProgramStartDate(): Flow<Long?>
     suspend fun setActiveProgramStartDate(value: Long?)
+
+    // Advanced Mode settings
+    fun advancedMode(): Flow<Boolean>
+    suspend fun setAdvancedMode(enabled: Boolean)
+
+    // Screen visibility settings
+    fun screenVisibility(screenName: String): Flow<Boolean>
+    suspend fun setScreenVisibility(screenName: String, visible: Boolean)
+
+    // Default workout values
+    fun defaultReps(): Flow<Int>
+    suspend fun setDefaultReps(reps: Int)
+    fun defaultSets(): Flow<Int>
+    suspend fun setDefaultSets(sets: Int)
+    fun defaultRest(): Flow<Int>
+    suspend fun setDefaultRest(seconds: Int)
+    fun defaultWeight(): Flow<Double>
+    suspend fun setDefaultWeight(weight: Double)
+
+    // Notes enabled
+    fun workoutNotesEnabled(): Flow<Boolean>
+    suspend fun setWorkoutNotesEnabled(enabled: Boolean)
+    fun setNotesEnabled(): Flow<Boolean>
+    suspend fun setSetNotesEnabled(enabled: Boolean)
 }
 
 interface MeasurementRepository {

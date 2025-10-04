@@ -48,8 +48,8 @@ fun Exercise.toEntity(): ExerciseEntity = ExerciseEntity(
 fun WorkoutLogEntity.toModel(): WorkoutLog = WorkoutLog(id, programId, dayIndex, date, completed, notes)
 fun WorkoutLog.toEntity(): WorkoutLogEntity = WorkoutLogEntity(id, programId, dayIndex, date, completed, notes)
 
-fun SetLogEntity.toModel(): SetLog = SetLog(id, workoutDayId, exerciseId, setIndex, reps, weight, rpe, timestamp)
-fun SetLog.toEntity(): SetLogEntity = SetLogEntity(id, workoutDayId, exerciseId, setIndex, reps, weight, rpe, timestamp)
+fun SetLogEntity.toModel(): SetLog = SetLog(id, workoutDayId, exerciseId, setIndex, reps, weight, rpe, notes, timestamp)
+fun SetLog.toEntity(): SetLogEntity = SetLogEntity(id, workoutDayId, exerciseId, setIndex, reps, weight, rpe, notes, timestamp)
 
 private val mapSer = MapSerializer(String.serializer(), Double.serializer().nullable)
 

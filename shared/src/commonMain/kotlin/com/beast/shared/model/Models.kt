@@ -39,6 +39,7 @@ data class SetLog(
     val reps: Int,
     val weight: Double,
     val rpe: Double? = null,
+    val notes: String? = null,
     val timestamp: Long,
 )
 
