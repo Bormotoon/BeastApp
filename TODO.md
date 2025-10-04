@@ -36,13 +36,15 @@
 ## 4. UI Android (androidApp)
 - ✅ [4.1] Настроить навигацию (`Navigation Compose`).
 - 🟡 [4.2] Реализовать экраны:
-    - 🟡 Onboarding (выбор единиц, выбор стартовой программы из списка)
-    - 🟡 Program List
-    - 🟡 Dashboard (кнопка «Начать новую тренировку», карточка Next Workout, история последних тренировок)
-    - ⬜ Workout Detail
-    - ⬜ Exercise Detail
-    - ⬜ Progress Tracking
-    - ⬜ Profile & Settings (смена акцентного цвета — ✅)
+    - ✅ Onboarding (выбор единиц, выбор стартовой программы из списка)
+    - ✅ Program List
+    - ✅ Program Detail
+    - ✅ Dashboard (кнопка «Начать новую тренировку», карточка Next Workout, история последних тренировок)
+    - ✅ Workout Detail
+    - ✅ Exercise Detail (детальный просмотр упражнения с демо-видео)
+    - ✅ Progress Tracking (график веса, замеры, фото прогресса)
+    - ✅ Calendar (месячный вид с планом и статусами)
+    - ✅ Profile & Settings (смена акцентного цвета, единицы измерения)
 - 🟡 [4.3] Настроить темы (Material 3, тёмная/светлая, настраиваемый акцент — ✅).
 - ⬜ [4.4] Добавить основные компоненты: FAB, BottomNavigation, Snackbar.
 

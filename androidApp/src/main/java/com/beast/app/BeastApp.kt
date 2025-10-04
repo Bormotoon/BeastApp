@@ -44,6 +44,7 @@ sealed class Route(val route: String, val label: String, val icon: ImageVector? 
     data object Profile : Route("profile", "Profile", Icons.Filled.Person)
     data object ProgramDetail : Route("program/{programId}", "Program", null)
     data object WorkoutDetail : Route("workout/{programId}/{dayIndex}", "Workout", null)
+    data object ExerciseDetail : Route("exercise/{exerciseId}", "Exercise", null)
 }
 
 @Composable
@@ -107,6 +108,13 @@ fun BeastApp() {
             composable(Route.ProgramDetail.route) { backStackEntry ->
                 val programId = backStackEntry.arguments?.getString("programId") ?: return@composable
                 ProgramDetailScreen(programId = programId)
+            }
+            composable(Route.ExerciseDetail.route) { backStackEntry ->
+                val exerciseId = backStackEntry.arguments?.getString("exerciseId") ?: return@composable
+                com.beast.app.exercise.ExerciseDetailScreen(
+                    exerciseId = exerciseId,
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
         }
     }
