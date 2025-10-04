@@ -1,5 +1,20 @@
 # 📥 Beast App - Program Import Format
 
+## 🚀 Quick Start
+
+**Recommended for beginners:** Use the ready-made template file:
+- **Location:** `docs/import-template.csv`
+- **Features:**
+  - Pre-formatted structure with headers
+  - Detailed instructions in Russian
+  - Example data you can modify
+  - Tips for popular programs (Body Beast, P90X, etc.)
+  - Comment lines (starting with #) that are automatically ignored
+
+Simply copy the template, fill in your workout data, and import!
+
+---
+
 ## Overview
 
 Beast App supports importing custom fitness programs via CSV files. This allows users to add their own 90-day (or any duration) workout programs with complete schedules.

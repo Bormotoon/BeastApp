@@ -1,3 +1,83 @@
+                        "Ошибка при сохранении шаблона: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun generateTemplateContent(): String {
+        return """
+            |# Beast App - Шаблон импорта программы тренировок
+            |# 
+            |# ИНСТРУКЦИИ:
+            |# - Строки, начинающиеся с #, являются комментариями и игнорируются
+            |# - Первая строка данных должна содержать заголовки столбцов
+            |# - Обязательные столбцы: day, title
+            |# - Опциональные столбцы: description, duration, exercises, video_url, rest_day, notes
+            |# 
+            |# ФОРМАТ ДАННЫХ:
+            |# - day: порядковый номер дня (1, 2, 3, ...)
+            |# - title: название тренировки
+            |# - description: описание тренировки (опционально)
+            |# - duration: длительность в минутах (опционально)
+            |# - exercises: упражнения через точку с запятой (опционально)
+            |# - video_url: ссылка на видео (опционально)
+            |# - rest_day: true/false - день отдыха (опционально)
+            |# - notes: дополнительные заметки (опционально)
+            |#
+            |# ПРИМЕРЫ УПРАЖНЕНИЙ (через ;):
+            |# bench-press;incline-db-press;cable-flyes;tricep-dips
+            |#
+            |# ДЛЯ ДНЕЙ ОТДЫХА:
+            |# Используйте rest_day=true или просто укажите "Rest Day" в названии
+            |#
+            |# =====================================================
+            |# НАЧАЛО ДАННЫХ - Заполните своими тренировками
+            |# =====================================================
+            |
+            |day,title,description,duration,exercises,rest_day,notes
+            |1,Chest & Triceps,Build phase - chest and triceps,45,bench-press;incline-db-press;tricep-dips,false,Фокус на технике
+            |2,Back & Biceps,Build phase - back and biceps,45,deadlift;bent-over-row;barbell-curl,false,Прогрессивная нагрузка
+            |3,Shoulders,Build phase - shoulders,40,military-press;lateral-raise;front-raise,false,Контролируйте вес
+            |4,Legs,Build phase - legs,50,squats;leg-press;leg-curl,false,Глубокие приседания
+            |5,Chest & Triceps,Build phase - chest and triceps,45,bench-press;cable-flyes;overhead-extension,false,
+            |6,Back & Biceps,Build phase - back and biceps,45,pull-ups;bent-over-row;hammer-curl,false,
+            |7,Rest Day,День восстановления,0,,true,Лёгкая растяжка
+            |8,Chest & Back,Bulk phase - chest and back,50,bench-press;deadlift;pull-ups,false,Суперсеты
+            |9,Arms,Bulk phase - biceps and triceps,40,barbell-curl;tricep-dips;hammer-curl,false,
+            |10,Legs & Shoulders,Bulk phase - legs and shoulders,55,squats;military-press;lateral-raise,false,
+            |
+            |# =====================================================
+            |# ПРОДОЛЖИТЕ ДОБАВЛЯТЬ ДНИ ПО ЭТОМУ ШАБЛОНУ
+            |# Для программы на 90 дней просто продолжайте до дня 90
+            |# =====================================================
+            |
+            |# ПОПУЛЯРНЫЕ ПРОГРАММЫ:
+            |#
+            |# Body Beast (90 дней):
+            |# - Фаза 1: Build (недели 1-3) - базовые упражнения
+            |# - Фаза 2: Bulk (недели 4-8) - увеличение объёма
+            |# - Фаза 3: Beast (недели 9-13) - максимальная интенсивность
+            |#
+            |# P90X (90 дней):
+            |# - Фаза 1 (недели 1-3) - базовые тренировки
+            |# - Неделя восстановления (неделя 4)
+            |# - Фаза 2 (недели 5-7) - усложнение
+            |# - Неделя восстановления (неделя 8)
+            |# - Фаза 3 (недели 9-13) - максимум
+            |#
+            |# СПИСОК ПОПУЛЯРНЫХ УПРАЖНЕНИЙ:
+            |# bench-press, incline-db-press, cable-flyes, tricep-dips,
+            |# deadlift, bent-over-row, pull-ups, barbell-curl, hammer-curl,
+            |# military-press, lateral-raise, front-raise, rear-delt-flye,
+            |# squats, leg-press, leg-curl, leg-extension, calf-raise
+            |#
+            |# =====================================================
+            |# После заполнения импортируйте файл через Beast App
+            |# =====================================================
+        """.trimMargin()
+    }
 package com.beast.app.programs
 
 import android.net.Uri
@@ -146,9 +226,23 @@ fun ImportProgramScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
+                    item {
+                        OutlinedButton(
+                            onClick = { viewModel.downloadTemplate(context) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Filled.Download, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Скачать шаблон CSV")
+                        }
+                    }
+
                     CircularProgressIndicator()
                     Spacer(modifier = Modifier.height(16.dp))
+import android.content.Context
                     Text(
+import android.os.Environment
+import android.widget.Toast
                         text = "Importing program...",
                         style = MaterialTheme.typography.titleMedium
                     )
@@ -156,6 +250,7 @@ fun ImportProgramScreen(
             } else if (uiState.importResult != null) {
                 // Result state
                 ImportResultView(
+import androidx.compose.material.icons.filled.Download
                     result = uiState.importResult!!,
                     onDismiss = {
                         viewModel.clearResult()
@@ -171,9 +266,13 @@ fun ImportProgramScreen(
                         .fillMaxSize()
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
+import kotlinx.coroutines.Dispatchers
                 ) {
                     item {
                         Text(
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
                             text = "Import Fitness Program",
                             style = MaterialTheme.typography.headlineMedium
                         )
@@ -243,6 +342,31 @@ fun ImportProgramScreen(
                         }
                     }
 
+
+    fun downloadTemplate(context: Context) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val templateContent = generateTemplateContent()
+                    val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                    val file = File(downloadsDir, "beast_app_program_template.csv")
+                    
+                    FileOutputStream(file).use { output ->
+                        output.write(templateContent.toByteArray())
+                    }
+                    
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            context,
+                            "Шаблон сохранён в Downloads: ${file.name}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        context,
                     item {
                         Button(
                             onClick = { filePickerLauncher.launch("text/*") },
