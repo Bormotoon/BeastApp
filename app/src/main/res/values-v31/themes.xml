@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Вариант темы для Android 12+ с системным Splash API -->
+    <style name="Theme.BeastApp" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="android:windowSplashScreenBackground">@android:color/black</item>
+        <!-- Опционально: цвет фона под иконкой (маска)
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/white</item> -->
+    </style>
+</resources>
