@@ -5,16 +5,16 @@
 ## 1. Архитектура и структура данных [MVP 1.0]
 
 ### 1.1. Модели данных (Kotlin Data Classes)
-- [ ] [MVP 1.0] **`Program`**: `name`, `durationDays`, `phases` (List<Phase>), `schedule` (Map<Int, String> - Day to WorkoutID).
-- [ ] [MVP 1.0] **`Phase`**: `name`, `durationWeeks`, `workouts` (List<Workout>).
-- [ ] [MVP 1.0] **`Workout`**: `id`, `name`, `durationMinutes`, `targetMuscleGroups` (List<String>), `exercises` (List<ExerciseInWorkout>).
-- [ ] [MVP 1.0] **`Exercise`**: `id`, `name`, `exerciseType` (Enum: STRENGTH, CARDIO, ISOMETRIC), `primaryMuscleGroup`, `equipment` (List<String>), `instructions`, `videoUrl`.
-- [ ] [MVP 1.0] **`ExerciseInWorkout`**: `exerciseId`, `set_type` (Enum: SINGLE, SUPER, GIANT, MULTI, FORCE, PROGRESSIVE, COMBO, CIRCUIT, TEMPO), `targetReps` (String, e.g., "15, 12, 8"), `notes`.
-- [ ] [MVP 1.0] **`WorkoutLog`**: `id`, `workoutId`, `date`, `totalDuration`, `totalVolume`, `totalReps`, `calories`, `notes`, `rating`, `status` (Enum: COMPLETED, INCOMPLETE).
-- [ ] [MVP 1.0] **`SetLog`**: `id`, `workoutLogId`, `exerciseId`, `setNumber`, `weight`, `reps`, `durationSeconds`, `distance`, `side` (Enum: LEFT, RIGHT, NONE), `isCompleted`, `notes`, `rpe`.
-- [ ] [MVP 1.0] **`UserProfile`**: `name`, `startDate`, `currentProgramId`, `weightUnit` (Enum: KG, LBS), `bodyWeightHistory` (Map<Date, Double>).
-- [ ] [MVP 1.0] **`BodyMeasurement`**: `date`, `chest`, `waist`, `hips`, `biceps` (L/R), `thighs` (L/R).
-- [ ] [MVP 1.0] **`PersonalRecord`**: `exerciseId`, `weight`, `reps`, `estimated1RM`, `date`.
+- [x] [MVP 1.0] **`Program`**: `name`, `durationDays`, `phases` (List<Phase>), `schedule` (Map<Int, String> - Day to WorkoutID).
+- [x] [MVP 1.0] **`Phase`**: `name`, `durationWeeks`, `workouts` (List<Workout>).
+- [x] [MVP 1.0] **`Workout`**: `id`, `name`, `durationMinutes`, `targetMuscleGroups` (List<String>), `exercises` (List<ExerciseInWorkout>).
+- [x] [MVP 1.0] **`Exercise`**: `id`, `name`, `exerciseType` (Enum: STRENGTH, CARDIO, ISOMETRIC), `primaryMuscleGroup`, `equipment` (List<String>), `instructions`, `videoUrl`.
+- [x] [MVP 1.0] **`ExerciseInWorkout`**: `exerciseId`, `set_type` (Enum: SINGLE, SUPER, GIANT, MULTI, FORCE, PROGRESSIVE, COMBO, CIRCUIT, TEMPO), `targetReps` (String, e.g., "15, 12, 8"), `notes`.
+- [x] [MVP 1.0] **`WorkoutLog`**: `id`, `workoutId`, `date`, `totalDuration`, `totalVolume`, `totalReps`, `calories`, `notes`, `rating`, `status` (Enum: COMPLETED, INCOMPLETE).
+- [x] [MVP 1.0] **`SetLog`**: `id`, `workoutLogId`, `exerciseId`, `setNumber`, `weight`, `reps`, `durationSeconds`, `distance`, `side` (Enum: LEFT, RIGHT, NONE), `isCompleted`, `notes`, `rpe`.
+- [x] [MVP 1.0] **`UserProfile`**: `name`, `startDate`, `currentProgramId`, `weightUnit` (Enum: KG, LBS), `bodyWeightHistory` (Map<Date, Double>).
+- [x] [MVP 1.0] **`BodyMeasurement`**: `date`, `chest`, `waist`, `hips`, `biceps` (L/R), `thighs` (L/R).
+- [x] [MVP 1.0] **`PersonalRecord`**: `exerciseId`, `weight`, `reps`, `estimated1RM`, `date`.
 
 + Note: to avoid confusion between naming in code/schemas and CSV/user-facing fields:
 + - `exerciseType` (on `Exercise`) refers to the ExerciseType enum (STRENGTH/CARDIO/ISOMETRIC) and describes the category of the exercise.
@@ -159,7 +159,7 @@
 ## 6. Импорт программ и формат конфигурации [MVP 1.0]
 - [ ] [MVP 1.0] PROGRAM_FORMAT v1: оформить JSON Schema (docs/PROGRAM_FORMAT.schema.json).
 - [ ] [MVP 1.0] Валидатор схемы: проверка структуры, удобные сообщения об ошибках (i18n).
-- [ ] [MVP 1.0] Поддержка YAML/CSV: конвертация → JSON модель; обработка типов сетов/первторений.
+- [ ] [MVP 1.0] Поддержка YAML/CSV: конвертация → JSON модель; обработка ��ипов сетов/первторений.
 - [ ] [MVP 1.0] Мастер импорта (wizard): загрузка файла → предпросмотр (90‑дневный календарь) → корректировки → импорт.
 - [ ] [MVP 1.0] Библиотека шаблонов: папка `/programs/` с 5–10 примерами (Body Beast, Insanity, P90X, Chloe Ting, Stronglifts).
 - [ ] [MVP 1.0] Логи ошибок импорта и отчёт после импорта (кол-во тренировок/упражнений, предупреждения).

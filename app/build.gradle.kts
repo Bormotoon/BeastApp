@@ -12,8 +12,8 @@ android {
 
     defaultConfig {
         applicationId = "com.beast.app"
-        minSdk = 24
-        targetSdk = 36
+        minSdk = 26
+        targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
 
@@ -33,6 +33,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Включаем десугаринг для java.time на API < 26
+        isCoreLibraryDesugaringEnabled = true
     }
 
     buildFeatures {
@@ -90,4 +92,7 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+
+    // Core library desugaring для java.time на minSdk < 26
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")
 }
