@@ -24,9 +24,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -47,9 +47,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.beast.app.ui.theme.BeastAppTheme
-import com.google.accompanist.navigation.animation.AnimatedNavHost
-import com.google.accompanist.navigation.animation.composable
-import com.google.accompanist.navigation.animation.rememberAnimatedNavController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import androidx.compose.animation.AnimatedContentTransitionScope
 
 class MainActivity : ComponentActivity() {
@@ -70,8 +70,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun AppNav() {
-    val navController = rememberAnimatedNavController()
-    AnimatedNavHost(
+    val navController = rememberNavController()
+    NavHost(
         navController = navController,
         startDestination = "home",
         enterTransition = {
@@ -134,7 +134,7 @@ private fun DetailsScreen(onBack: () -> Unit) {
                 title = { Text("Детали", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
                 }
             )
