@@ -22,11 +22,11 @@
 + - In documentation and import files: user-facing CSV/JSON commonly uses snake_case (e.g. `set_type`, `video_url`), while internal/richer JSON and Kotlin code use camelCase (e.g. `setType`, `videoUrl`). See `docs/DATA_MODEL_REFERENCE.md` for enum definitions.
 
 ### 1.2. База данных (Room)
-- [ ] [MVP 1.0] Настроить Room Database и `build.gradle`.
-- [ ] [MVP 1.0] Создать `TypeConverter` для списков, дат и Enum.
-- [ ] [MVP 1.0] Создать DAO для каждой основной сущности (`ProgramDao`, `WorkoutDao`, `WorkoutLogDao`, etc.).
-- [ ] [MVP 1.0] Определить связи (через `@Relation` или промежуточные таблицы) для `Program-Phase-Workout`.
-- [ ] [MVP 1.0] Настроить первую миграцию базы данных.
+- [x] [MVP 1.0] Настроить Room Database и `build.gradle`.
+- [x] [MVP 1.0] Создать `TypeConverter` для списков, дат и Enum.
+- [x] [MVP 1.0] Создать DAO для каждой основной сущности (`ProgramDao`, `WorkoutDao`, `WorkoutLogDao`, etc.).
+- [x] [MVP 1.0] Определить связи (через `@Relation` или промежуточные таблицы) для `Program-Phase-Workout`.
+- [x] [MVP 1.0] Настроить первую миграцию базы данных.
 
 ### 1.3. Логика данных
 - [ ] [MVP 1.0] Реализовать паттерн "Репозиторий" для всех DAO.
@@ -336,7 +336,7 @@
 - [ ] [MVP 2.0] Material Design 3: тема, типографика, цветовые токены, компоненты.
 - [ ] [MVP 2.0] Светлая/тёмная темы, Dynamic Color (Material You).
 - [ ] [MVP 2.0] Анимации переходов/появления, ripple, прогресс‑бары, таймер, метрики.
-- [ ] [MVP 2.0] Достижения: анимированные поздравления (конфетти), эффекты при PR.
+- [ ] [MVP 2.0] ��остижения: анимированные поздравления (конфетти), эффекты при PR.
 
 ## 43. Планшеты и ландшафт [MVP 2.0]
 - [ ] [MVP 2.0] Two‑pane layout (Master‑Detail) для списка/деталей.

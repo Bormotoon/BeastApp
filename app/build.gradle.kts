@@ -4,6 +4,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.devtools.ksp")
 }
 
 android {
@@ -47,6 +48,13 @@ kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
     }
+}
+
+// Аргументы для генератора Room (схемы, инкрементальность)
+ksp {
+    arg("room.schemaLocation", "${projectDir}/schemas")
+    arg("room.incremental", "true")
+    arg("room.generateKotlin", "true")
 }
 
 dependencies {
@@ -95,4 +103,9 @@ dependencies {
 
     // Core library desugaring для java.time на minSdk < 26
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")
+
+    // Room
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
 }
