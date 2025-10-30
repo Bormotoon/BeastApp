@@ -51,6 +51,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.lifecycle.lifecycleScope
+import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import com.beast.app.data.db.DatabaseProvider
+import com.beast.app.data.repo.ProgramRepository
+import com.beast.app.ui.program.ProgramScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,9 +67,31 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT)
         )
+
+        seedDemoProgramIfFirstRun()
+
         setContent {
             BeastAppTheme {
                 AppNav()
+            }
+        }
+    }
+
+    private fun seedDemoProgramIfFirstRun() {
+        val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+        val seeded = prefs.getBoolean("seed_v1_done", false)
+        if (seeded) return
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val json = assets.open("sample_program.json").bufferedReader().use { it.readText() }
+                val db = DatabaseProvider.get(applicationContext)
+                val repo = ProgramRepository(db)
+                val result = repo.importFromJson(json)
+                Log.i("BeastApp", "Demo program imported: ${'$'}result")
+                prefs.edit().putBoolean("seed_v1_done", true).apply()
+            } catch (t: Throwable) {
+                Log.e("BeastApp", "Failed to seed demo program", t)
             }
         }
     }
@@ -90,17 +119,21 @@ private fun AppNav() {
         composable("home") {
             HomeScreen(
                 onToggle = {},
-                onOpenDetails = { navController.navigate("details") }
+                onOpenDetails = { navController.navigate("details") },
+                onOpenPrograms = { navController.navigate("programs") }
             )
         }
         composable("details") {
             DetailsScreen(onBack = { navController.popBackStack() })
         }
+        composable("programs") {
+            ProgramScreen(onBack = { navController.popBackStack() })
+        }
     }
 }
 
 @Composable
-private fun HomeScreen(onToggle: () -> Unit, onOpenDetails: () -> Unit) {
+private fun HomeScreen(onToggle: () -> Unit, onOpenDetails: () -> Unit, onOpenPrograms: () -> Unit) {
     var expanded by remember { mutableStateOf(true) }
 
     Scaffold(
@@ -116,8 +149,8 @@ private fun HomeScreen(onToggle: () -> Unit, onOpenDetails: () -> Unit) {
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = onOpenDetails,
-                text = { Text("Подробнее") },
+                onClick = onOpenPrograms,
+                text = { Text("Программы") },
                 icon = { Icon(Icons.Filled.Favorite, contentDescription = null) }
             )
         }
@@ -204,5 +237,5 @@ private fun BeastContent(padding: PaddingValues, expanded: Boolean) {
 @Preview(showBackground = true)
 @Composable
 private fun PreviewBeast() {
-    BeastAppTheme { HomeScreen(onToggle = {}, onOpenDetails = {}) }
+    BeastAppTheme { HomeScreen(onToggle = {}, onOpenDetails = {}, onOpenPrograms = {}) }
 }
