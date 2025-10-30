@@ -59,6 +59,7 @@ import com.beast.app.data.db.DatabaseProvider
 import com.beast.app.data.repo.ProgramRepository
 import com.beast.app.domain.usecase.ImportProgramUseCase
 import com.beast.app.ui.program.ProgramScreen
+import com.beast.app.ui.program.ProgramSelectionScreen
 import com.beast.app.ui.onboarding.OnboardingScreen
 
 class MainActivity : ComponentActivity() {
@@ -128,10 +129,18 @@ private fun AppNav(onboardingShown: Boolean, onOnboardingFinished: () -> Unit) {
         composable("onboarding") {
             OnboardingScreen(onFinish = {
                 onOnboardingFinished()
-                navController.navigate("home") {
+                navController.navigate("program_selection") {
                     popUpTo("onboarding") { inclusive = true }
                 }
             })
+        }
+        composable("program_selection") {
+            ProgramSelectionScreen(onStartProgram = {
+                // TODO: save program choice to UserProfile and generate calendar
+                navController.navigate("home") {
+                    popUpTo("program_selection") { inclusive = true }
+                }
+            }, onBack = { navController.popBackStack() })
         }
         composable("home") {
             HomeScreen(
