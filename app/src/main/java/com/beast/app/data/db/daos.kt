@@ -35,6 +35,9 @@ interface ProgramDao {
 
     @Query("SELECT * FROM programs ORDER BY name")
     suspend fun getAllPrograms(): List<ProgramEntity>
+
+    @Query("SELECT * FROM program_schedule WHERE programName = :programName ORDER BY dayNumber")
+    suspend fun getSchedule(programName: String): List<ProgramScheduleEntity>
 }
 
 @Dao

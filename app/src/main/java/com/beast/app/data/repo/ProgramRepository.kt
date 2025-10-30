@@ -108,4 +108,9 @@ class ProgramRepository(
             exercisesLinked = mappings.size
         )
     }
+
+    // Возвращает расписание (список ProgramScheduleEntity) для программы
+    suspend fun getSchedule(programName: String): List<ProgramScheduleEntity> = withContext(Dispatchers.IO) {
+        programDao.getSchedule(programName)
+    }
 }

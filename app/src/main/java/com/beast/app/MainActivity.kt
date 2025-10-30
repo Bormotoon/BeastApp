@@ -140,7 +140,7 @@ private fun AppNav(onboardingShown: Boolean, onOnboardingFinished: () -> Unit) {
                 navController.navigate("home") {
                     popUpTo("program_selection") { inclusive = true }
                 }
-            }, onBack = { navController.popBackStack() })
+            })
         }
         composable("home") {
             HomeScreen(
