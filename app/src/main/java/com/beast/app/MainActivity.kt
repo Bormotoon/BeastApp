@@ -57,6 +57,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.beast.app.data.db.DatabaseProvider
 import com.beast.app.data.repo.ProgramRepository
+import com.beast.app.domain.usecase.ImportProgramUseCase
 import com.beast.app.ui.program.ProgramScreen
 
 class MainActivity : ComponentActivity() {
@@ -87,8 +88,9 @@ class MainActivity : ComponentActivity() {
                 val json = assets.open("sample_program.json").bufferedReader().use { it.readText() }
                 val db = DatabaseProvider.get(applicationContext)
                 val repo = ProgramRepository(db)
-                val result = repo.importFromJson(json)
-                Log.i("BeastApp", "Demo program imported: ${'$'}result")
+                val useCase = ImportProgramUseCase(repo)
+                useCase(json)
+                Log.i("BeastApp", "Demo program imported")
                 prefs.edit().putBoolean("seed_v1_done", true).apply()
             } catch (t: Throwable) {
                 Log.e("BeastApp", "Failed to seed demo program", t)

@@ -3,6 +3,7 @@ package com.beast.app.ui.import
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.beast.app.data.repo.ProgramRepository
+import com.beast.app.domain.usecase.ImportProgramUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -15,7 +16,7 @@ sealed interface ImportState {
 }
 
 class ProgramImportViewModel(
-    private val repo: ProgramRepository
+    private val useCase: ImportProgramUseCase
 ) : ViewModel() {
     private val _state = MutableStateFlow<ImportState>(ImportState.Idle)
     val state: StateFlow<ImportState> = _state
@@ -24,7 +25,7 @@ class ProgramImportViewModel(
         viewModelScope.launch {
             _state.value = ImportState.InProgress
             try {
-                val res = repo.importFromJson(json)
+                val res = useCase(json)
                 _state.value = ImportState.Success(res)
             } catch (e: Exception) {
                 _state.value = ImportState.Error(e.message ?: "Unknown error")
@@ -32,4 +33,3 @@ class ProgramImportViewModel(
         }
     }
 }
-

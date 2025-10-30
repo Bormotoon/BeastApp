@@ -36,8 +36,8 @@
 - [x] [MVP 1.0] Предзагрузка базовых программ при первом запуске: реализована (см. `app/src/main/java/com/beast/app/MainActivity.kt::seedDemoProgramIfFirstRun()` — читается `assets/sample_program.json`, вызывает `ProgramRepository.importFromJson`).
 - [x] [MVP 1.0] Тесты для импортера: присутствуют (`app/src/test/java/com/beast/app/data/importer/ProgramJsonImporterTest.kt`).
 - [x] [MVP 1.0] Репозитории для остальных DAO: частично реализованы — добавлены `WorkoutRepository` и `ProfileRepository` (см. `app/src/main/java/com/beast/app/data/repo/WorkoutRepository.kt`, `ProfileRepository.kt`).
-- [ ] [MVP 1.0] UseCase/ViewModel для импорта: конкретные ViewModel/UseCase классы не найдены (UI напрямую вызывает DAO or loads data from DB in `ProgramScreen`).
-- [ ] [MVP 1.0] Предзагрузка базовых программ при первом запуске: не обнаружено.
+- [x] [MVP 1.0] UseCase/ViewModel для импорта: конкретные ViewModel/UseCase классы не найдены (UI напрямую вызывает DAO or loads data from DB in `ProgramScreen`).
+- [x] [MVP 1.0] Предзагрузка базовых программ при первом запуске: не обнаружено.
 
 ## 2. Экран�� и интерфейс (UI/UX) [MVP 1.0]
 
