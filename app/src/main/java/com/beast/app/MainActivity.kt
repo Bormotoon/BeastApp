@@ -59,6 +59,7 @@ import com.beast.app.data.db.DatabaseProvider
 import com.beast.app.data.repo.ProgramRepository
 import com.beast.app.domain.usecase.ImportProgramUseCase
 import com.beast.app.ui.program.ProgramScreen
+import com.beast.app.ui.onboarding.OnboardingScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,9 +72,14 @@ class MainActivity : ComponentActivity() {
 
         seedDemoProgramIfFirstRun()
 
+        val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+        val onboardingShown = prefs.getBoolean("onboarding_shown", false)
+
         setContent {
             BeastAppTheme {
-                AppNav()
+                AppNav(onboardingShown = onboardingShown, onOnboardingFinished = {
+                    prefs.edit().putBoolean("onboarding_shown", true).apply()
+                })
             }
         }
     }
@@ -100,11 +106,12 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun AppNav() {
+private fun AppNav(onboardingShown: Boolean, onOnboardingFinished: () -> Unit) {
     val navController = rememberNavController()
+    val start = if (!onboardingShown) "onboarding" else "home"
     NavHost(
         navController = navController,
-        startDestination = "home",
+        startDestination = start,
         enterTransition = {
             slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left) + fadeIn()
         },
@@ -118,6 +125,14 @@ private fun AppNav() {
             slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right) + fadeOut()
         }
     ) {
+        composable("onboarding") {
+            OnboardingScreen(onFinish = {
+                onOnboardingFinished()
+                navController.navigate("home") {
+                    popUpTo("onboarding") { inclusive = true }
+                }
+            })
+        }
         composable("home") {
             HomeScreen(
                 onToggle = {},
