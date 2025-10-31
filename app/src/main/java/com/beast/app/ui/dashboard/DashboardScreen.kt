@@ -6,16 +6,20 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -75,13 +79,64 @@ fun DashboardScreen(
                     CircularProgressIndicator()
                 }
             } else {
-                item {
-                    Text(
-                        text = "Продолжение панели появится скоро",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                if (state.progressCard.isVisible) {
+                    item {
+                        ProgressCard(
+                            state = state.progressCard,
+                            onStartWorkout = onStartWorkout
+                        )
+                    }
+                } else {
+                    item {
+                        Text(
+                            text = "Продолжение панели появится скоро",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgressCard(state: ProgressCardState, onStartWorkout: () -> Unit) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = state.programName,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = "День ${state.dayNumber} из ${state.totalDays}",
+                style = MaterialTheme.typography.headlineSmall
+            )
+            LinearProgressIndicator(
+                progress = { state.progressFraction },
+                modifier = Modifier.fillMaxWidth()
+            )
+            val phase = state.currentPhaseName
+            val week = state.currentPhaseWeek
+            if (!phase.isNullOrBlank() || week != null) {
+                Text(
+                    text = buildString {
+                        if (!phase.isNullOrBlank()) {
+                            append("Фаза: ")
+                            append(phase)
+                        }
+                        if (week != null) {
+                            if (!phase.isNullOrBlank()) append(" · ")
+                            append("Неделя ")
+                            append(week)
+                        }
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Button(onClick = onStartWorkout) {
+                Text("Открыть тренировку")
             }
         }
     }

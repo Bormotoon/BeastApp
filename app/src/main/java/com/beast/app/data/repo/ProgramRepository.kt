@@ -22,6 +22,13 @@ class ProgramRepository(
         val exercisesLinked: Int
     )
 
+    data class ProgramSummary(
+        val program: ProgramEntity,
+        val phases: List<PhaseEntity>,
+        val schedule: List<ProgramScheduleEntity>,
+        val phaseByWorkout: Map<String, String>
+    )
+
     suspend fun importFromJson(json: String): ImportResult = withContext(Dispatchers.IO) {
         val model = importer.parse(json)
         val programName = model.title.trim()
@@ -112,5 +119,20 @@ class ProgramRepository(
     // Возвращает расписание (список ProgramScheduleEntity) для программы
     suspend fun getSchedule(programName: String): List<ProgramScheduleEntity> = withContext(Dispatchers.IO) {
         programDao.getSchedule(programName)
+    }
+
+    suspend fun getProgramSummary(programName: String): ProgramSummary? = withContext(Dispatchers.IO) {
+        val program = programDao.getProgram(programName) ?: return@withContext null
+        val phases = programDao.getPhases(programName)
+        val schedule = programDao.getSchedule(programName)
+        val phaseWorkouts = programDao.getPhaseWorkouts(programName)
+        ProgramSummary(
+            program = program,
+            phases = phases,
+            schedule = schedule,
+            phaseByWorkout = phaseWorkouts.associate { crossRef ->
+                crossRef.workoutId to crossRef.phaseName
+            }
+        )
     }
 }

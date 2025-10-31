@@ -38,6 +38,9 @@ interface ProgramDao {
 
     @Query("SELECT * FROM program_schedule WHERE programName = :programName ORDER BY dayNumber")
     suspend fun getSchedule(programName: String): List<ProgramScheduleEntity>
+
+    @Query("SELECT * FROM phase_workout WHERE programName = :programName")
+    suspend fun getPhaseWorkouts(programName: String): List<PhaseWorkoutCrossRefEntity>
 }
 
 @Dao
