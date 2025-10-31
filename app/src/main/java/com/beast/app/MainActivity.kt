@@ -141,8 +141,8 @@ private fun AppNav(onboardingShown: Boolean, programSetupDone: Boolean, onOnboar
             DashboardRoute(
                 onOpenProfile = { navController.navigate("profile") },
                 onOpenSettings = { navController.navigate("settings") },
-                onStartWorkout = { navController.navigate("details") },
-                onViewWorkoutDetails = { navController.navigate("details") }
+                onStartWorkout = { _ -> navController.navigate("details") },
+                onViewWorkoutDetails = { _ -> navController.navigate("details") }
             )
         }
         composable("details") {

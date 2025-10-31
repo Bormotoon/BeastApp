@@ -5,8 +5,11 @@ package com.beast.app.ui.dashboard
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -21,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -36,8 +40,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 fun DashboardRoute(
     onOpenProfile: () -> Unit,
     onOpenSettings: () -> Unit,
-    onStartWorkout: () -> Unit,
-    onViewWorkoutDetails: () -> Unit,
+    onStartWorkout: (String) -> Unit,
+    onViewWorkoutDetails: (String) -> Unit,
     viewModel: DashboardViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -55,8 +59,8 @@ fun DashboardScreen(
     state: DashboardUiState,
     onOpenProfile: () -> Unit,
     onOpenSettings: () -> Unit,
-    onStartWorkout: () -> Unit,
-    onViewWorkoutDetails: () -> Unit
+    onStartWorkout: (String) -> Unit,
+    onViewWorkoutDetails: (String) -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -75,18 +79,21 @@ fun DashboardScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             if (state.isLoading) {
-                item {
-                    CircularProgressIndicator()
-                }
+                item { CircularProgressIndicator() }
             } else {
                 if (state.progressCard.isVisible) {
+                    item { ProgressCard(state = state.progressCard) }
+                }
+                if (state.todayWorkout.isVisible) {
                     item {
-                        ProgressCard(
-                            state = state.progressCard,
-                            onStartWorkout = onStartWorkout
+                        TodayWorkoutCard(
+                            state = state.todayWorkout,
+                            onStartWorkout = onStartWorkout,
+                            onViewWorkoutDetails = onViewWorkoutDetails
                         )
                     }
-                } else {
+                }
+                if (!state.progressCard.isVisible && !state.todayWorkout.isVisible) {
                     item {
                         Text(
                             text = "Продолжение панели появится скоро",
@@ -101,7 +108,7 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun ProgressCard(state: ProgressCardState, onStartWorkout: () -> Unit) {
+private fun ProgressCard(state: ProgressCardState) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
@@ -135,8 +142,101 @@ private fun ProgressCard(state: ProgressCardState, onStartWorkout: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Button(onClick = onStartWorkout) {
-                Text("Открыть тренировку")
+        }
+    }
+}
+
+@Composable
+private fun TodayWorkoutCard(
+    state: TodayWorkoutCardState,
+    onStartWorkout: (String) -> Unit,
+    onViewWorkoutDetails: (String) -> Unit
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = state.title,
+                style = MaterialTheme.typography.titleLarge
+            )
+            if (state.subtitle.isNotBlank()) {
+                Text(
+                    text = state.subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            val statusColor = when (state.statusType) {
+                WorkoutStatus.SCHEDULED -> MaterialTheme.colorScheme.primary
+                WorkoutStatus.REST -> MaterialTheme.colorScheme.tertiary
+                WorkoutStatus.UPCOMING -> MaterialTheme.colorScheme.secondary
+                WorkoutStatus.COMPLETED -> MaterialTheme.colorScheme.primary
+                WorkoutStatus.FINISHED -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+
+            if (state.statusText.isNotBlank()) {
+                Text(
+                    text = state.statusText,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = statusColor
+                )
+            }
+
+            if (state.description.isNotBlank()) {
+                Text(
+                    text = state.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            if (state.durationMinutes > 0 || state.exerciseCount > 0) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (state.durationMinutes > 0) {
+                        Text(
+                            text = "~${state.durationMinutes} мин",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (state.exerciseCount > 0) {
+                        Text(
+                            text = "${state.exerciseCount} упражнений",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            if (state.muscleGroups.isNotEmpty()) {
+                Text(
+                    text = "Целевые мышцы: ${state.muscleGroups.joinToString(", ")}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            val workoutId = state.workoutId
+            if (workoutId != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Button(
+                    onClick = { onStartWorkout(workoutId) },
+                    enabled = state.startButtonEnabled,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Начать тренировку")
+                }
+                OutlinedButton(
+                    onClick = { onViewWorkoutDetails(workoutId) },
+                    enabled = state.viewDetailsEnabled,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Просмотр деталей")
+                }
             }
         }
     }
