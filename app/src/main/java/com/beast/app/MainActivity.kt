@@ -139,6 +139,10 @@ private fun AppNav(onboardingShown: Boolean, programSetupDone: Boolean, onOnboar
         }
         composable("home") {
             DashboardRoute(
+                onNavigateHome = {},
+                onOpenCalendar = { navController.navigate("calendar") },
+                onOpenProgram = { navController.navigate("programs") },
+                onOpenProgress = { navController.navigate("progress") },
                 onOpenProfile = { navController.navigate("profile") },
                 onOpenSettings = { navController.navigate("settings") },
                 onStartWorkout = { _ -> navController.navigate("details") },
@@ -150,6 +154,12 @@ private fun AppNav(onboardingShown: Boolean, programSetupDone: Boolean, onOnboar
         }
         composable("profile") {
             ProfileScreen(onBack = { navController.popBackStack() })
+        }
+        composable("calendar") {
+            CalendarScreen(onBack = { navController.popBackStack() })
+        }
+        composable("progress") {
+            ProgressScreen(onBack = { navController.popBackStack() })
         }
         composable("programs") {
             ProgramScreen(onBack = { navController.popBackStack() })
@@ -226,6 +236,88 @@ private fun ProfileScreen(onBack: () -> Unit) {
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+@Composable
+private fun CalendarScreen(onBack: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Календарь", style = MaterialTheme.typography.titleLarge) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            ElevatedCard(modifier = Modifier) {
+                Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Календарь тренировок в разработке",
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "Здесь появится месячный календарь с прогрессом",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 8.dp),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgressScreen(onBack: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Прогресс", style = MaterialTheme.typography.titleLarge) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            ElevatedCard(modifier = Modifier) {
+                Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Аналитика прогресса ещё не готова",
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "В будущих версиях здесь появятся графики и статистика",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 8.dp),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
         }
     }
 }

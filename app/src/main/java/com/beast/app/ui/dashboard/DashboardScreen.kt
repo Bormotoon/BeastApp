@@ -13,8 +13,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.FitnessCenter
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -25,12 +29,18 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,6 +48,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
 fun DashboardRoute(
+    onNavigateHome: () -> Unit,
+    onOpenCalendar: () -> Unit,
+    onOpenProgram: () -> Unit,
+    onOpenProgress: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenSettings: () -> Unit,
     onStartWorkout: (String) -> Unit,
@@ -47,6 +61,10 @@ fun DashboardRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     DashboardScreen(
         state = state,
+        onNavigateHome = onNavigateHome,
+        onOpenCalendar = onOpenCalendar,
+        onOpenProgram = onOpenProgram,
+        onOpenProgress = onOpenProgress,
         onOpenProfile = onOpenProfile,
         onOpenSettings = onOpenSettings,
         onStartWorkout = onStartWorkout,
@@ -57,17 +75,37 @@ fun DashboardRoute(
 @Composable
 fun DashboardScreen(
     state: DashboardUiState,
+    onNavigateHome: () -> Unit,
+    onOpenCalendar: () -> Unit,
+    onOpenProgram: () -> Unit,
+    onOpenProgress: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenSettings: () -> Unit,
     onStartWorkout: (String) -> Unit,
     onViewWorkoutDetails: (String) -> Unit
 ) {
+    var selectedTab by rememberSaveable { mutableStateOf(DashboardNavDestination.HOME) }
     Scaffold(
         topBar = {
             DashboardTopBar(
                 topBar = state.topBar,
                 onOpenProfile = onOpenProfile,
                 onOpenSettings = onOpenSettings
+            )
+        },
+        bottomBar = {
+            DashboardBottomBar(
+                selected = selectedTab,
+                onSelect = { destination ->
+                    selectedTab = destination
+                    when (destination) {
+                        DashboardNavDestination.HOME -> onNavigateHome()
+                        DashboardNavDestination.CALENDAR -> onOpenCalendar()
+                        DashboardNavDestination.PROGRAMS -> onOpenProgram()
+                        DashboardNavDestination.PROGRESS -> onOpenProgress()
+                        DashboardNavDestination.PROFILE -> onOpenProfile()
+                    }
+                }
             )
         }
     ) { innerPadding ->
@@ -238,6 +276,43 @@ private fun TodayWorkoutCard(
                     Text("Просмотр деталей")
                 }
             }
+        }
+    }
+}
+
+private enum class DashboardNavDestination { HOME, CALENDAR, PROGRAMS, PROGRESS, PROFILE }
+
+private data class DashboardNavItem(
+    val destination: DashboardNavDestination,
+    val label: String,
+    val icon: ImageVector
+)
+
+@Composable
+private fun DashboardBottomBar(
+    selected: DashboardNavDestination,
+    onSelect: (DashboardNavDestination) -> Unit
+) {
+    val items = listOf(
+        DashboardNavItem(DashboardNavDestination.HOME, "Главная", Icons.Outlined.Home),
+        DashboardNavItem(DashboardNavDestination.CALENDAR, "Календарь", Icons.Outlined.CalendarMonth),
+        DashboardNavItem(DashboardNavDestination.PROGRAMS, "Программа", Icons.AutoMirrored.Outlined.List),
+        DashboardNavItem(DashboardNavDestination.PROGRESS, "Прогресс", Icons.Outlined.BarChart),
+        DashboardNavItem(DashboardNavDestination.PROFILE, "Профиль", Icons.Outlined.AccountCircle)
+    )
+    NavigationBar {
+        items.forEach { item ->
+            NavigationBarItem(
+                selected = selected == item.destination,
+                onClick = { onSelect(item.destination) },
+                icon = {
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = item.label
+                    )
+                },
+                label = { Text(item.label) }
+            )
         }
     }
 }
