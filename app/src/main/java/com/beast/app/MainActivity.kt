@@ -43,9 +43,11 @@ import com.beast.app.data.repo.ProgramRepository
 import com.beast.app.domain.usecase.ImportProgramUseCase
 import com.beast.app.ui.dashboard.DashboardRoute
 import com.beast.app.ui.onboarding.OnboardingScreen
-import com.beast.app.ui.program.ProgramScreen
+import com.beast.app.ui.program.ProgramRoute
 import com.beast.app.ui.program.ProgramSelectionScreen
 import com.beast.app.ui.theme.BeastAppTheme
+import com.beast.app.ui.activeworkout.ActiveWorkoutRoute
+import com.beast.app.ui.workoutdetail.WorkoutDetailRoute
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -145,12 +147,39 @@ private fun AppNav(onboardingShown: Boolean, programSetupDone: Boolean, onOnboar
                 onOpenProgress = { navController.navigate("progress") },
                 onOpenProfile = { navController.navigate("profile") },
                 onOpenSettings = { navController.navigate("settings") },
-                onStartWorkout = { _ -> navController.navigate("details") },
-                onViewWorkoutDetails = { _ -> navController.navigate("details") }
+                onStartWorkout = { workoutId ->
+                    navController.navigate("active_workout/$workoutId") { launchSingleTop = true }
+                },
+                onViewWorkoutDetails = { workoutId ->
+                    navController.navigate("workout/$workoutId") { launchSingleTop = true }
+                }
             )
         }
-        composable("details") {
-            DetailsScreen(onBack = { navController.popBackStack() })
+        composable("workout/{workoutId}") { backStackEntry ->
+            val workoutId = backStackEntry.arguments?.getString("workoutId")
+            if (workoutId == null) {
+                navController.popBackStack()
+            } else {
+                WorkoutDetailRoute(
+                    onBack = { navController.popBackStack() },
+                    onStartWorkout = { id ->
+                        navController.navigate("active_workout/$id") { launchSingleTop = true }
+                    }
+                )
+            }
+        }
+        composable("active_workout/{workoutId}") { backStackEntry ->
+            val workoutId = backStackEntry.arguments?.getString("workoutId")
+            if (workoutId == null) {
+                navController.popBackStack()
+            } else {
+                ActiveWorkoutRoute(
+                    onBack = { navController.popBackStack() },
+                    onWorkoutCompleted = { _ ->
+                        navController.popBackStack("home", false)
+                    }
+                )
+            }
         }
         composable("profile") {
             ProfileScreen(onBack = { navController.popBackStack() })
@@ -162,49 +191,20 @@ private fun AppNav(onboardingShown: Boolean, programSetupDone: Boolean, onOnboar
             ProgressScreen(onBack = { navController.popBackStack() })
         }
         composable("programs") {
-            ProgramScreen(onBack = { navController.popBackStack() })
+            ProgramRoute(
+                onBack = { navController.popBackStack() },
+                onStartWorkout = { workoutId ->
+                    navController.navigate("active_workout/$workoutId") { launchSingleTop = true }
+                },
+                onViewWorkoutDetails = { workoutId ->
+                    navController.navigate("workout/$workoutId") { launchSingleTop = true }
+                }
+            )
         }
         composable("settings") {
             SettingsScreen(onBack = { navController.popBackStack() }, onChangeProgram = {
                 navController.navigate("program_selection")
             })
-        }
-    }
-}
-
-@Composable
-private fun DetailsScreen(onBack: () -> Unit) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Детали", style = MaterialTheme.typography.titleLarge) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Это экран деталей",
-                style = MaterialTheme.typography.headlineSmall,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = "Навигация работает, edge-to-edge включён",
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(top = 8.dp),
-                textAlign = TextAlign.Center
-            )
         }
     }
 }

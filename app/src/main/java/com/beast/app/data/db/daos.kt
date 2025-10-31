@@ -58,8 +58,14 @@ interface WorkoutDao {
     @Query("SELECT * FROM workouts WHERE id = :id LIMIT 1")
     suspend fun getWorkout(id: String): WorkoutEntity?
 
+    @Query("SELECT * FROM workouts WHERE id IN (:ids)")
+    suspend fun getWorkoutsByIds(ids: List<String>): List<WorkoutEntity>
+
     @Query("SELECT * FROM exercise_in_workout WHERE workoutId = :workoutId ORDER BY orderIndex")
     suspend fun getExerciseMappings(workoutId: String): List<ExerciseInWorkoutEntity>
+
+    @Query("SELECT * FROM exercise_in_workout WHERE workoutId IN (:workoutIds) ORDER BY workoutId, orderIndex")
+    suspend fun getExerciseMappingsForWorkouts(workoutIds: List<String>): List<ExerciseInWorkoutEntity>
 
     @Query("SELECT * FROM exercises WHERE id IN (:ids)")
     suspend fun getExercisesByIds(ids: List<String>): List<ExerciseEntity>
@@ -79,6 +85,19 @@ interface WorkoutLogDao {
 
     @Query("SELECT * FROM set_logs WHERE workoutLogId = :workoutLogId ORDER BY setNumber")
     suspend fun getSetLogs(workoutLogId: String): List<SetLogEntity>
+
+    @Query(
+        """
+        SELECT wl.* FROM workout_logs wl
+        INNER JOIN (
+            SELECT workoutId, MAX(dateEpochMillis) AS maxDate
+            FROM workout_logs
+            WHERE workoutId IN (:workoutIds)
+            GROUP BY workoutId
+        ) grouped ON wl.workoutId = grouped.workoutId AND wl.dateEpochMillis = grouped.maxDate
+        """
+    )
+    suspend fun getLatestLogsForWorkouts(workoutIds: List<String>): List<WorkoutLogEntity>
 }
 
 // Profile / measurements

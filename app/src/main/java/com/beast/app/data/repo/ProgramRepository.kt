@@ -29,6 +29,21 @@ class ProgramRepository(
         val phaseByWorkout: Map<String, String>
     )
 
+    data class ProgramPhaseOverview(
+        val program: ProgramEntity,
+        val phases: List<PhaseOverview>
+    )
+
+    data class PhaseOverview(
+        val phase: PhaseEntity,
+        val workouts: List<WorkoutOverview>
+    )
+
+    data class WorkoutOverview(
+        val workout: WorkoutEntity,
+        val exerciseCount: Int
+    )
+
     suspend fun importFromJson(json: String): ImportResult = withContext(Dispatchers.IO) {
         val model = importer.parse(json)
         val programName = model.title.trim()
@@ -134,5 +149,38 @@ class ProgramRepository(
                 crossRef.workoutId to crossRef.phaseName
             }
         )
+    }
+
+    suspend fun getProgramPhaseOverview(programName: String): ProgramPhaseOverview? = withContext(Dispatchers.IO) {
+        val program = programDao.getProgram(programName) ?: return@withContext null
+        val phases = programDao.getPhases(programName)
+        val phaseWorkouts = programDao.getPhaseWorkouts(programName)
+
+        if (phases.isEmpty() || phaseWorkouts.isEmpty()) {
+            return@withContext ProgramPhaseOverview(program, phases.map { PhaseOverview(it, emptyList()) })
+        }
+
+        val workoutIds = phaseWorkouts.map { it.workoutId }.distinct()
+        val workouts = workoutDao.getWorkoutsByIds(workoutIds).associateBy { it.id }
+        val mappings = workoutDao.getExerciseMappingsForWorkouts(workoutIds).groupBy { it.workoutId }
+        val groupedByPhase = phaseWorkouts.groupBy { it.phaseName }
+
+        val phaseOverview = phases.map { phase ->
+            val ids = groupedByPhase[phase.name]?.map { it.workoutId } ?: emptyList()
+            val workoutOverviews = ids.mapNotNull { workoutId ->
+                val workout = workouts[workoutId] ?: return@mapNotNull null
+                WorkoutOverview(
+                    workout = workout,
+                    exerciseCount = mappings[workoutId]?.size ?: 0
+                )
+            }
+            PhaseOverview(phase = phase, workouts = workoutOverviews)
+        }
+
+        ProgramPhaseOverview(program = program, phases = phaseOverview)
+    }
+
+    suspend fun getFirstProgram(): ProgramEntity? = withContext(Dispatchers.IO) {
+        programDao.getAllPrograms().firstOrNull()
     }
 }

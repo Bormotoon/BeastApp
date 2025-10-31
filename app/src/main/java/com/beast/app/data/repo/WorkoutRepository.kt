@@ -9,11 +9,22 @@ import androidx.room.withTransaction
  * Repository providing higher-level operations around workouts, exercises and logs.
  * Mirrors style of ProgramRepository and centralizes DB interactions for workout-related features.
  */
-class WorkoutRepository(
-    private val db: BeastDatabase
+class WorkoutRepository private constructor(
+    private val workoutDao: WorkoutDao,
+    private val workoutLogDao: WorkoutLogDao,
+    private val dbOrNull: BeastDatabase?
 ) {
-    private val workoutDao = db.workoutDao()
-    private val workoutLogDao = db.workoutLogDao()
+    constructor(db: BeastDatabase) : this(
+        workoutDao = db.workoutDao(),
+        workoutLogDao = db.workoutLogDao(),
+        dbOrNull = db
+    )
+
+    constructor(workoutDao: WorkoutDao, workoutLogDao: WorkoutLogDao) : this(
+        workoutDao = workoutDao,
+        workoutLogDao = workoutLogDao,
+        dbOrNull = null
+    )
 
     data class WorkoutWithExercises(
         val workout: WorkoutEntity,
@@ -44,7 +55,14 @@ class WorkoutRepository(
      * Returns true if successful.
      */
     suspend fun insertWorkoutLogWithSets(log: WorkoutLogEntity, setLogs: List<SetLogEntity>) = withContext(Dispatchers.IO) {
-        db.withTransaction {
+        val db = dbOrNull
+        if (db != null) {
+            db.withTransaction {
+                workoutLogDao.insertWorkoutLog(log)
+                if (setLogs.isNotEmpty()) workoutLogDao.insertSetLogs(setLogs)
+            }
+        } else {
+            // Fallback path for tests where we don't have a real RoomDatabase
             workoutLogDao.insertWorkoutLog(log)
             if (setLogs.isNotEmpty()) workoutLogDao.insertSetLogs(setLogs)
         }
@@ -56,6 +74,11 @@ class WorkoutRepository(
 
     suspend fun getSetLogsForWorkoutLog(workoutLogId: String): List<SetLogEntity> = withContext(Dispatchers.IO) {
         workoutLogDao.getSetLogs(workoutLogId)
+    }
+
+    suspend fun getLatestLogsForWorkouts(workoutIds: List<String>): Map<String, WorkoutLogEntity> = withContext(Dispatchers.IO) {
+        if (workoutIds.isEmpty()) return@withContext emptyMap()
+        workoutLogDao.getLatestLogsForWorkouts(workoutIds).associateBy { it.workoutId }
     }
 }
 

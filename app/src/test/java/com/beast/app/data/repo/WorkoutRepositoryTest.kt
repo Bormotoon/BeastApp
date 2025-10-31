@@ -28,7 +28,12 @@ class FakeWorkoutDao : WorkoutDao {
 
     override suspend fun getWorkout(id: String): WorkoutEntity? = workouts[id]
 
+    override suspend fun getWorkoutsByIds(ids: List<String>): List<WorkoutEntity> = ids.mapNotNull { workouts[it] }
+
     override suspend fun getExerciseMappings(workoutId: String): List<ExerciseInWorkoutEntity> = mappings[workoutId]?.toList() ?: emptyList()
+
+    override suspend fun getExerciseMappingsForWorkouts(workoutIds: List<String>): List<ExerciseInWorkoutEntity> =
+        workoutIds.flatMap { id -> mappings[id]?.toList() ?: emptyList() }
 
     override suspend fun getExercisesByIds(ids: List<String>): List<ExerciseEntity> = ids.mapNotNull { exercises[it] }
 }
@@ -48,38 +53,28 @@ class FakeWorkoutLogDao : WorkoutLogDao {
     override suspend fun getLogsForWorkout(workoutId: String): List<WorkoutLogEntity> = logs.filter { it.workoutId == workoutId }
 
     override suspend fun getSetLogs(workoutLogId: String): List<SetLogEntity> = setLogs[workoutLogId]?.toList() ?: emptyList()
+
+    override suspend fun getLatestLogsForWorkouts(workoutIds: List<String>): List<WorkoutLogEntity> {
+        return workoutIds.mapNotNull { id ->
+            logs.filter { it.workoutId == id }.maxByOrNull { it.dateEpochMillis }
+        }
+    }
 }
 
 // Fake BeastDatabase provides required DAOs
+// For these JVM tests we avoid subclassing RoomDatabase to dodge internal API differences.
+// Instead, we pass fakes directly into the repository via its testing constructor.
 class FakeBeastDatabase(
     val workoutDaoImpl: WorkoutDao = FakeWorkoutDao(),
     val workoutLogDaoImpl: WorkoutLogDao = FakeWorkoutLogDao()
-) : BeastDatabase() {
-    override fun programDao(): ProgramDao = throw UnsupportedOperationException()
-    override fun workoutDao(): WorkoutDao = workoutDaoImpl
-    override fun workoutLogDao(): WorkoutLogDao = workoutLogDaoImpl
-    override fun profileDao(): ProfileDao = throw UnsupportedOperationException()
-
-    // RoomDatabase abstract methods - not needed for these unit tests, provide minimal implementations
-    override fun clearAllTables() {
-        // no-op for tests
-    }
-
-    override fun createInvalidationTracker(): InvalidationTracker {
-        throw UnsupportedOperationException("createInvalidationTracker is not supported in FakeBeastDatabase for unit tests")
-    }
-
-    override fun createOpenHelper(config: RoomDatabase.Configuration): SupportSQLiteOpenHelper {
-        throw UnsupportedOperationException("createOpenHelper is not supported in FakeBeastDatabase for unit tests")
-    }
-}
+)
 
 class WorkoutRepositoryTest {
 
     @Test
     fun `getWorkoutWithExercises returns null when missing`() = runBlocking {
         val db = FakeBeastDatabase()
-        val repo = WorkoutRepository(db)
+        val repo = WorkoutRepository(db.workoutDaoImpl, db.workoutLogDaoImpl)
         val result = repo.getWorkoutWithExercises("missing")
         assertNull(result)
     }
@@ -98,7 +93,7 @@ class WorkoutRepositoryTest {
         ))
 
         val db = FakeBeastDatabase(workoutDaoImpl = fakeWorkoutDao)
-        val repo = WorkoutRepository(db)
+        val repo = WorkoutRepository(db.workoutDaoImpl, db.workoutLogDaoImpl)
         val composed = repo.getWorkoutWithExercises("w1")
         assertNotNull(composed)
         assertEquals("W1", composed!!.workout.name)
@@ -110,7 +105,7 @@ class WorkoutRepositoryTest {
     fun `logs and set logs roundtrip`() = runBlocking {
         val fakeWorkoutLogDao = FakeWorkoutLogDao()
         val db = FakeBeastDatabase(workoutLogDaoImpl = fakeWorkoutLogDao)
-        val repo = WorkoutRepository(db)
+        val repo = WorkoutRepository(db.workoutDaoImpl, db.workoutLogDaoImpl)
 
         val log = WorkoutLogEntity(id = "log1", workoutId = "w1", dateEpochMillis = 1L, totalDuration = 30, totalVolume = 100.0, totalReps = 20, calories = null, notes = null, rating = null, status = "COMPLETED")
         val sets = listOf(
