@@ -69,7 +69,7 @@ class FakeBeastDatabase(
         throw UnsupportedOperationException("createInvalidationTracker is not supported in FakeBeastDatabase for unit tests")
     }
 
-    override fun createOpenHelper(config: RoomDatabase.DatabaseConfiguration): SupportSQLiteOpenHelper {
+    override fun createOpenHelper(config: RoomDatabase.Configuration): SupportSQLiteOpenHelper {
         throw UnsupportedOperationException("createOpenHelper is not supported in FakeBeastDatabase for unit tests")
     }
 }

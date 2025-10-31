@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -75,12 +76,17 @@ class MainActivity : ComponentActivity() {
 
         val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
         val onboardingShown = prefs.getBoolean("onboarding_shown", false)
+        val programSetupDone = prefs.getBoolean("program_setup_done", false)
 
         setContent {
             BeastAppTheme {
-                AppNav(onboardingShown = onboardingShown, onOnboardingFinished = {
-                    prefs.edit().putBoolean("onboarding_shown", true).apply()
-                })
+                AppNav(
+                    onboardingShown = onboardingShown,
+                    programSetupDone = programSetupDone,
+                    onOnboardingFinished = {
+                        prefs.edit().putBoolean("onboarding_shown", true).apply()
+                    }
+                )
             }
         }
     }
@@ -107,9 +113,13 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun AppNav(onboardingShown: Boolean, onOnboardingFinished: () -> Unit) {
+private fun AppNav(onboardingShown: Boolean, programSetupDone: Boolean, onOnboardingFinished: () -> Unit) {
     val navController = rememberNavController()
-    val start = if (!onboardingShown) "onboarding" else "home"
+    val start = when {
+        !onboardingShown -> "onboarding"
+        !programSetupDone -> "program_selection"
+        else -> "home"
+    }
     NavHost(
         navController = navController,
         startDestination = start,
@@ -136,7 +146,6 @@ private fun AppNav(onboardingShown: Boolean, onOnboardingFinished: () -> Unit) {
         }
         composable("program_selection") {
             ProgramSelectionScreen(onStartProgram = {
-                // TODO: save program choice to UserProfile and generate calendar
                 navController.navigate("home") {
                     popUpTo("program_selection") { inclusive = true }
                 }
@@ -146,7 +155,8 @@ private fun AppNav(onboardingShown: Boolean, onOnboardingFinished: () -> Unit) {
             HomeScreen(
                 onToggle = {},
                 onOpenDetails = { navController.navigate("details") },
-                onOpenPrograms = { navController.navigate("programs") }
+                onOpenPrograms = { navController.navigate("programs") },
+                onOpenSettings = { navController.navigate("settings") }
             )
         }
         composable("details") {
@@ -155,11 +165,16 @@ private fun AppNav(onboardingShown: Boolean, onOnboardingFinished: () -> Unit) {
         composable("programs") {
             ProgramScreen(onBack = { navController.popBackStack() })
         }
+        composable("settings") {
+            SettingsScreen(onBack = { navController.popBackStack() }, onChangeProgram = {
+                navController.navigate("program_selection")
+            })
+        }
     }
 }
 
 @Composable
-private fun HomeScreen(onToggle: () -> Unit, onOpenDetails: () -> Unit, onOpenPrograms: () -> Unit) {
+private fun HomeScreen(onToggle: () -> Unit, onOpenDetails: () -> Unit, onOpenPrograms: () -> Unit, onOpenSettings: () -> Unit) {
     var expanded by remember { mutableStateOf(true) }
 
     Scaffold(
@@ -167,6 +182,9 @@ private fun HomeScreen(onToggle: () -> Unit, onOpenDetails: () -> Unit, onOpenPr
             TopAppBar(
                 title = { Text("BeastApp", style = MaterialTheme.typography.titleLarge) },
                 actions = {
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Filled.Settings, contentDescription = null)
+                    }
                     IconButton(onClick = { expanded = !expanded; onToggle() }) {
                         Icon(Icons.Filled.AutoAwesome, contentDescription = null)
                     }
@@ -223,6 +241,41 @@ private fun DetailsScreen(onBack: () -> Unit) {
 }
 
 @Composable
+private fun SettingsScreen(onBack: () -> Unit, onChangeProgram: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Настройки", style = MaterialTheme.typography.titleLarge) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Top,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            ElevatedCard(modifier = Modifier) {
+                Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(text = "Программа", style = MaterialTheme.typography.titleMedium)
+                    Text(text = "Выбор и изменение активной программы", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+                    androidx.compose.material3.Button(onClick = onChangeProgram, modifier = Modifier.padding(top = 12.dp)) {
+                        Text("Изменить программу")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun BeastContent(padding: PaddingValues, expanded: Boolean) {
     Column(
         modifier = Modifier
@@ -263,5 +316,5 @@ private fun BeastContent(padding: PaddingValues, expanded: Boolean) {
 @Preview(showBackground = true)
 @Composable
 private fun PreviewBeast() {
-    BeastAppTheme { HomeScreen(onToggle = {}, onOpenDetails = {}, onOpenPrograms = {}) }
+    BeastAppTheme { HomeScreen(onToggle = {}, onOpenDetails = {}, onOpenPrograms = {}, onOpenSettings = {}) }
 }

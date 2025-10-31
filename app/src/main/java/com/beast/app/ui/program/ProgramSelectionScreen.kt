@@ -95,23 +95,46 @@ fun ProgramSelectionScreen(onStartProgram: () -> Unit) {
             // Сохраняем выбор во SharedPreferences (быстрая локальная запись)
             saveProgramSelection(context, selected.value, startDate.value, weightUnit.value)
 
-            // Также сохраняем профиль в базе данных (асинхронно)
+            // Также сохраняем профиль в базе данных (асинхронно) и генерируем календарь на основе фактической программы из БД
             scope.launch(Dispatchers.IO) {
                 try {
                     val db = DatabaseProvider.get(context.applicationContext)
                     val profileRepo = ProfileRepository(db)
+
+                    // Определяем и��я программы, по которому реально есть расписание в БД
+                    var programNameForSchedule = when (selected.value) {
+                        // Если позже будут импортированы шаблоны Body Beast, попробуем их человеко-читаемые имена
+                        "huge" -> "Body Beast: Huge Beast"
+                        "lean" -> "Body Beast: Lean Beast"
+                        else -> selected.value
+                    }
+
+                    // Пытаемся получить расписание по ожидаемому имени
+                    val programRepo = com.beast.app.data.repo.ProgramRepository(db)
+                    var schedule = try { programRepo.getSchedule(programNameForSchedule) } catch (_: Throwable) { emptyList() }
+
+                    // Фолбэк: если расписание не найдено, используем первую доступную программу в БД (например, демо "Sample CSV Program")
+                    if (schedule.isEmpty()) {
+                        try {
+                            val all = db.programDao().getAllPrograms()
+                            if (all.isNotEmpty()) {
+                                programNameForSchedule = all.first().name
+                                schedule = programRepo.getSchedule(programNameForSchedule)
+                            }
+                        } catch (_: Throwable) { /* ignore */ }
+                    }
+
+                    // Обновляем профиль, сохраняя фактическое имя текущей программы
                     val profile = UserProfileEntity(
                         name = "",
                         startDateEpochDay = startDate.value.toEpochDay(),
-                        currentProgramId = selected.value,
+                        currentProgramId = programNameForSchedule,
                         weightUnit = weightUnit.value
                     )
                     profileRepo.upsertProfile(profile)
 
-                    // Генерируем пользовательский календарь на основе расписания программы и сохраняем в SharedPreferences
+                    // Генерируем пользовательский календарь (epochDay -> workoutId) и сохраняем в SharedPreferences
                     try {
-                        val programRepo = com.beast.app.data.repo.ProgramRepository(db)
-                        val schedule = programRepo.getSchedule(selected.value)
                         if (schedule.isNotEmpty()) {
                             val calendarJson = JSONObject()
                             for (entry in schedule) {
@@ -120,7 +143,10 @@ fun ProgramSelectionScreen(onStartProgram: () -> Unit) {
                                 calendarJson.put(epochDay.toString(), entry.workoutId)
                             }
                             val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-                            prefs.edit().putString("user_calendar", calendarJson.toString()).apply()
+                            prefs.edit()
+                                .putString("user_calendar", calendarJson.toString())
+                                .putString("current_program_name", programNameForSchedule)
+                                .apply()
                         }
                     } catch (_: Throwable) {
                         // ignore calendar generation errors for now
@@ -161,5 +187,10 @@ private fun showDatePicker(context: Context, onDateSet: (year: Int, month: Int, 
 
 private fun saveProgramSelection(context: Context, programSlug: String, startDate: LocalDate, weightUnit: String) {
     val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-    prefs.edit().putString("selected_program", programSlug).putString("weight_unit", weightUnit).putLong("program_start_epoch_day", startDate.toEpochDay()).apply()
+    prefs.edit()
+        .putString("selected_program", programSlug)
+        .putString("weight_unit", weightUnit)
+        .putLong("program_start_epoch_day", startDate.toEpochDay())
+        .putBoolean("program_setup_done", true)
+        .apply()
 }
