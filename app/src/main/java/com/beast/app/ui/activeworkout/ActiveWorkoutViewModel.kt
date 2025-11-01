@@ -10,6 +10,7 @@ import com.beast.app.data.db.SetLogEntity
 import com.beast.app.data.repo.ProfileRepository
 import com.beast.app.data.repo.ProgramRepository
 import com.beast.app.data.repo.WorkoutRepository
+import com.beast.app.model.SetType
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +27,18 @@ class ActiveWorkoutViewModel(
     application: Application,
     savedStateHandle: SavedStateHandle
 ) : AndroidViewModel(application) {
+
+    companion object {
+        private const val DEFAULT_REST_SECONDS = 60
+        private const val SUPER_GIANT_REST_SECONDS = 60
+        private const val FORCE_SET_REST_SECONDS = 10
+        private const val FORCE_SET_TOTAL_SETS = 5
+        private const val PROGRESSIVE_SET_REST_SECONDS = 90
+        private val DEFAULT_PROGRESSIVE_PATTERN = listOf("15", "12", "8", "8", "12", "15")
+    }
+
+    private data class RestTrigger(val seconds: Int, val showDialog: Boolean)
+    private data class GroupInfo(val id: String?, val position: Int, val size: Int)
 
     private val workoutId: String = savedStateHandle.get<String>("workoutId")
         ?: throw IllegalArgumentException("workoutId is required")
@@ -81,8 +94,11 @@ class ActiveWorkoutViewModel(
 
     fun nextExercise() {
         _uiState.update { state ->
-            if (state.currentExerciseIndex >= state.exercises.lastIndex) return@update state
-            val newIndex = state.currentExerciseIndex + 1
+            val order = state.visibleExerciseIndices
+            if (order.isEmpty()) return@update state
+            val currentPosition = order.indexOf(state.currentExerciseIndex)
+            if (currentPosition == -1 || currentPosition >= order.lastIndex) return@update state
+            val newIndex = order[currentPosition + 1]
             state.copy(
                 currentExerciseIndex = newIndex,
                 currentExerciseId = state.exercises.getOrNull(newIndex)?.id
@@ -92,8 +108,11 @@ class ActiveWorkoutViewModel(
 
     fun previousExercise() {
         _uiState.update { state ->
-            if (state.currentExerciseIndex <= 0) return@update state
-            val newIndex = state.currentExerciseIndex - 1
+            val order = state.visibleExerciseIndices
+            if (order.isEmpty()) return@update state
+            val currentPosition = order.indexOf(state.currentExerciseIndex)
+            if (currentPosition <= 0) return@update state
+            val newIndex = order[currentPosition - 1]
             state.copy(
                 currentExerciseIndex = newIndex,
                 currentExerciseId = state.exercises.getOrNull(newIndex)?.id
@@ -101,7 +120,7 @@ class ActiveWorkoutViewModel(
         }
     }
 
-    fun startRestTimer(totalSeconds: Int = 60, showDialog: Boolean = true) {
+    fun startRestTimer(totalSeconds: Int = DEFAULT_REST_SECONDS, showDialog: Boolean = true) {
         restTimerJob?.cancel()
         if (totalSeconds <= 0) {
             _uiState.update { it.copy(restTimer = null) }
@@ -246,6 +265,8 @@ class ActiveWorkoutViewModel(
             ?: return
 
         val markCompleted = !currentSet.completed
+        val targetSetNumber = currentSet.setNumber
+        val setType = _uiState.value.exercises.firstOrNull { it.id == exerciseId }?.setType
 
         _uiState.updateSet(exerciseId, setIndex) { set ->
             val filledWeight = if (markCompleted && set.weightInput.isBlank() && set.previousWeight != null) {
@@ -266,7 +287,57 @@ class ActiveWorkoutViewModel(
         }
 
         if (markCompleted) {
-            startRestTimer(showDialog = true)
+            val updatedState = _uiState.value
+            val restTrigger = computeRestTrigger(updatedState, exerciseId, targetSetNumber, setType)
+            restTrigger?.let { trigger ->
+                val shouldShowDialog = trigger.showDialog
+                startRestTimer(totalSeconds = trigger.seconds, showDialog = shouldShowDialog)
+            }
+        }
+    }
+
+    private fun computeRestTrigger(
+        state: ActiveWorkoutUiState,
+        exerciseId: String,
+        setNumber: Int,
+        setTypeHint: SetType?
+    ): RestTrigger? {
+        val exercise = state.exercises.firstOrNull { it.id == exerciseId } ?: return null
+        val type = setTypeHint ?: exercise.setType
+        return when (type) {
+            SetType.SUPER, SetType.GIANT -> {
+                val groupId = exercise.groupId ?: return null
+                val groupMembers = state.exercises.filter { it.groupId == groupId }
+                if (groupMembers.size < 2) {
+                    val seconds = exercise.restSuggestionSeconds ?: DEFAULT_REST_SECONDS
+                    return RestTrigger(seconds = seconds, showDialog = true)
+                }
+                val allCompletedForSet = groupMembers.all { member ->
+                    member.sets.firstOrNull { it.setNumber == setNumber }?.completed == true
+                }
+                if (allCompletedForSet) {
+                    val seconds = exercise.restSuggestionSeconds ?: SUPER_GIANT_REST_SECONDS
+                    RestTrigger(seconds = seconds, showDialog = true)
+                } else {
+                    null
+                }
+            }
+            SetType.FORCE -> {
+                val seconds = exercise.restSuggestionSeconds ?: FORCE_SET_REST_SECONDS
+                RestTrigger(seconds = seconds, showDialog = seconds >= 20)
+            }
+            SetType.PROGRESSIVE -> {
+                val midpoint = exercise.sets.size / 2
+                if (midpoint > 0 && setNumber == midpoint) {
+                    RestTrigger(seconds = exercise.restSuggestionSeconds ?: PROGRESSIVE_SET_REST_SECONDS, showDialog = true)
+                } else {
+                    null
+                }
+            }
+            else -> {
+                val seconds = exercise.restSuggestionSeconds ?: DEFAULT_REST_SECONDS
+                RestTrigger(seconds = seconds, showDialog = true)
+            }
         }
     }
 
@@ -353,23 +424,51 @@ class ActiveWorkoutViewModel(
             workoutRepository.getSetLogsForWorkoutLog(latestLog.id).groupBy { it.exerciseId }
         } else emptyMap()
 
-        val exercises = workoutData.mappings.mapNotNull { mapping ->
-            val exercise = workoutData.exercises.firstOrNull { it.id == mapping.exerciseId } ?: return@mapNotNull null
-            val targetRepsList = mapping.targetReps.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        val setTypes = workoutData.mappings.map { parseSetType(it.setType) }
+        val groupInfos = computeGroupInfos(setTypes)
+
+        val exercises = workoutData.mappings.mapIndexedNotNull { index, mapping ->
+            val exercise = workoutData.exercises.firstOrNull { it.id == mapping.exerciseId } ?: return@mapIndexedNotNull null
+            val setType = setTypes[index]
+            val rawTargets = mapping.targetReps.split(',').map { it.trim() }.filter { it.isNotEmpty() }
             val previousLogs = setLogsByExercise[exercise.id]?.sortedBy { it.setNumber } ?: emptyList()
 
-            val totalSets = when {
-                targetRepsList.isNotEmpty() -> targetRepsList.size
-                previousLogs.isNotEmpty() -> previousLogs.size
-                else -> 1
+            val targetRepsList = when (setType) {
+                SetType.FORCE -> (0 until FORCE_SET_TOTAL_SETS).map { step ->
+                    rawTargets.getOrNull(step)?.takeIf { it.isNotBlank() } ?: "5"
+                }
+                SetType.PROGRESSIVE -> {
+                    if (rawTargets.isEmpty()) {
+                        DEFAULT_PROGRESSIVE_PATTERN
+                    } else {
+                        val merged = DEFAULT_PROGRESSIVE_PATTERN.toMutableList()
+                        rawTargets.forEachIndexed { idx, value ->
+                            if (idx < merged.size && value.isNotBlank()) {
+                                merged[idx] = value
+                            }
+                        }
+                        merged
+                    }
+                }
+                else -> rawTargets
             }
 
-            val sets = (0 until totalSets).map { index ->
-                val goal = targetRepsList.getOrNull(index)
-                val prev = previousLogs.getOrNull(index)
+            val totalSets = when (setType) {
+                SetType.FORCE -> FORCE_SET_TOTAL_SETS
+                SetType.PROGRESSIVE -> targetRepsList.size
+                else -> when {
+                    targetRepsList.isNotEmpty() -> targetRepsList.size
+                    previousLogs.isNotEmpty() -> previousLogs.size
+                    else -> 1
+                }
+            }
+
+            val sets = (0 until totalSets).map { setIdx ->
+                val goal = targetRepsList.getOrNull(setIdx)
+                val prev = previousLogs.getOrNull(setIdx)
                 val prevVolume = if (prev?.weight != null && prev.reps != null) prev.weight * prev.reps else null
                 ActiveSetState(
-                    setNumber = index + 1,
+                    setNumber = setIdx + 1,
                     previousWeight = prev?.weight,
                     previousReps = prev?.reps,
                     previousSummary = buildPreviousSummary(prev),
@@ -382,19 +481,34 @@ class ActiveWorkoutViewModel(
                 )
             }
 
+            val groupInfo = groupInfos.getOrNull(index) ?: GroupInfo(null, 0, 1)
+
             ActiveExerciseState(
                 id = exercise.id,
                 name = exercise.name,
-                setType = mapping.setType,
-                setTypeLabel = formatSetType(mapping.setType),
+                setType = setType,
+                setTypeLabel = formatSetType(setType),
                 notes = mapping.notes,
                 instructions = exercise.instructions,
                 videoUrl = exercise.videoUrl,
                 primaryMuscle = exercise.primaryMuscleGroup,
                 equipment = exercise.equipment,
-                sets = sets
+                sets = sets,
+                groupId = groupInfo.id,
+                groupPosition = groupInfo.position,
+                groupSize = groupInfo.size,
+                restSuggestionSeconds = restSuggestionFor(setType)
             )
         }
+
+        val visibleIndices = exercises.mapIndexedNotNull { idx, exercise ->
+            val info = groupInfos.getOrNull(idx)
+            if (info?.id == null || info.position == 0) idx else null
+        }
+        val displayIndices = if (visibleIndices.isNotEmpty()) visibleIndices else exercises.indices.toList()
+        val totalDisplayExercises = if (exercises.isEmpty()) 0 else displayIndices.size
+        val initialExerciseIndex = displayIndices.firstOrNull() ?: 0
+        val currentExerciseId = exercises.getOrNull(initialExerciseIndex)?.id
 
         _uiState.value = ActiveWorkoutUiState(
             isLoading = false,
@@ -405,11 +519,66 @@ class ActiveWorkoutViewModel(
             weightUnit = profile?.weightUnit?.lowercase(Locale.getDefault()) ?: "kg",
             workoutMuscleGroups = workoutData.workout.targetMuscleGroups,
             exercises = exercises,
-            currentExerciseIndex = 0,
-            currentExerciseId = exercises.firstOrNull()?.id,
-            totalExercises = exercises.size,
+            visibleExerciseIndices = displayIndices,
+            totalExercises = totalDisplayExercises,
+            currentExerciseIndex = initialExerciseIndex,
+            currentExerciseId = currentExerciseId,
             isTimerRunning = true
         )
+    }
+
+    private fun restSuggestionFor(type: SetType): Int = when (type) {
+        SetType.SUPER, SetType.GIANT -> SUPER_GIANT_REST_SECONDS
+        SetType.FORCE -> FORCE_SET_REST_SECONDS
+        SetType.PROGRESSIVE -> PROGRESSIVE_SET_REST_SECONDS
+        else -> DEFAULT_REST_SECONDS
+    }
+
+    private fun parseSetType(raw: String?): SetType {
+        if (raw.isNullOrBlank()) return SetType.SINGLE
+        return runCatching { SetType.valueOf(raw.uppercase(Locale.getDefault())) }.getOrElse { SetType.SINGLE }
+    }
+
+    private fun computeGroupInfos(setTypes: List<SetType>): List<GroupInfo> {
+        if (setTypes.isEmpty()) return emptyList()
+        val result = MutableList(setTypes.size) { GroupInfo(id = null, position = 0, size = 1) }
+        var index = 0
+        var groupCounter = 0
+        while (index < setTypes.size) {
+            val type = setTypes[index]
+            val expectedSize = when (type) {
+                SetType.SUPER -> 2
+                SetType.GIANT -> 3
+                else -> 1
+            }
+            val groupIndices = mutableListOf<Int>()
+            for (offset in 0 until expectedSize) {
+                val candidate = index + offset
+                if (candidate >= setTypes.size) break
+                if (setTypes[candidate] == type) {
+                    groupIndices += candidate
+                } else {
+                    break
+                }
+            }
+            if (groupIndices.isEmpty()) {
+                result[index] = GroupInfo(id = null, position = 0, size = 1)
+                index += 1
+                continue
+            }
+            val actualSize = groupIndices.size
+            val groupId = if (actualSize > 1) {
+                "${type.name.lowercase(Locale.getDefault())}_$groupCounter"
+            } else {
+                null
+            }
+            groupIndices.forEachIndexed { position, idx ->
+                result[idx] = GroupInfo(id = groupId, position = position, size = actualSize)
+            }
+            if (groupId != null) groupCounter += 1
+            index += actualSize
+        }
+        return result
     }
 
     private fun buildCompletionSummary(state: ActiveWorkoutUiState): ActiveWorkoutResult {
@@ -480,12 +649,16 @@ class ActiveWorkoutViewModel(
         }
     }
 
-    private fun formatSetType(raw: String?): String {
-        if (raw.isNullOrBlank()) return "Обычный"
-        return raw.lowercase(Locale.getDefault())
-            .replace('_', ' ')
-            .replace('-', ' ')
-            .replaceFirstChar { it.titlecase(Locale.getDefault()) }
+    private fun formatSetType(type: SetType): String = when (type) {
+        SetType.SINGLE -> "Обычный сет"
+        SetType.SUPER -> "Super Set"
+        SetType.GIANT -> "Giant Set"
+        SetType.MULTI -> "Multi Set"
+        SetType.FORCE -> "Force Set"
+        SetType.PROGRESSIVE -> "Progressive Set"
+        SetType.COMBO -> "Combo Set"
+        SetType.CIRCUIT -> "Circuit"
+        SetType.TEMPO -> "Tempo Set"
     }
 
     private fun formatWeight(weight: Double): String {
@@ -508,6 +681,7 @@ data class ActiveWorkoutUiState(
     val workoutMuscleGroups: List<String> = emptyList(),
     val weightUnit: String = "kg",
     val exercises: List<ActiveExerciseState> = emptyList(),
+    val visibleExerciseIndices: List<Int> = emptyList(),
     val totalExercises: Int = 0,
     val currentExerciseIndex: Int = 0,
     val currentExerciseId: String? = null,
@@ -522,14 +696,18 @@ data class ActiveWorkoutUiState(
 data class ActiveExerciseState(
     val id: String,
     val name: String,
-    val setType: String?,
+    val setType: SetType,
     val setTypeLabel: String,
     val notes: String?,
     val instructions: String?,
     val videoUrl: String?,
     val primaryMuscle: String,
     val equipment: List<String>,
-    val sets: List<ActiveSetState>
+    val sets: List<ActiveSetState>,
+    val groupId: String? = null,
+    val groupPosition: Int = 0,
+    val groupSize: Int = 1,
+    val restSuggestionSeconds: Int? = null
 )
 
 data class ActiveSetState(
