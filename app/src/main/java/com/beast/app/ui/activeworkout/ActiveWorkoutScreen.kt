@@ -5,8 +5,14 @@
 
 package com.beast.app.ui.activeworkout
 
+import android.content.Context
 import android.content.Intent
+import android.media.RingtoneManager
 import android.net.Uri
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -73,6 +79,14 @@ fun ActiveWorkoutRoute(
         val result = state.completedResult ?: return@LaunchedEffect
         onWorkoutCompleted(result)
         viewModel.acknowledgeCompletion()
+    }
+
+    LaunchedEffect(state.restTimer?.shouldNotify) {
+        val shouldNotify = state.restTimer?.shouldNotify == true
+        if (shouldNotify) {
+            triggerRestTimerAlert(context)
+            viewModel.acknowledgeRestTimerAlert()
+        }
     }
 
     ActiveWorkoutScreen(
@@ -761,4 +775,38 @@ private fun formatTime(totalSeconds: Int): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return "%d:%02d".format(minutes, seconds)
+}
+
+private fun triggerRestTimerAlert(context: Context) {
+    playRestTimerTone(context)
+    vibrateForRestTimer(context)
+}
+
+private fun playRestTimerTone(context: Context) {
+    runCatching {
+        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        val ringtone = RingtoneManager.getRingtone(context, uri)
+        ringtone?.play()
+    }
+}
+
+private fun vibrateForRestTimer(context: Context) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val manager = context.getSystemService(VibratorManager::class.java)
+        val vibrator = manager?.defaultVibrator
+        if (vibrator?.hasVibrator() != true) return
+        val effect = VibrationEffect.createOneShot(500L, VibrationEffect.DEFAULT_AMPLITUDE)
+        vibrator.vibrate(effect)
+    } else {
+        @Suppress("DEPRECATION")
+        val legacyVibrator = context.getSystemService(Vibrator::class.java)
+        if (legacyVibrator?.hasVibrator() != true) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val effect = VibrationEffect.createOneShot(500L, VibrationEffect.DEFAULT_AMPLITUDE)
+            legacyVibrator.vibrate(effect)
+        } else {
+            @Suppress("DEPRECATION")
+            legacyVibrator.vibrate(500L)
+        }
+    }
 }

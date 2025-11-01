@@ -113,7 +113,8 @@ class ActiveWorkoutViewModel(
                     totalSeconds = totalSeconds,
                     remainingSeconds = totalSeconds,
                     isRunning = true,
-                    showDialog = showDialog
+                    showDialog = showDialog,
+                    shouldNotify = false
                 )
             )
         }
@@ -128,7 +129,12 @@ class ActiveWorkoutViewModel(
                     if (nextValue <= 0) {
                         shouldStop = true
                         state.copy(
-                            restTimer = timer.copy(remainingSeconds = 0, isRunning = false, showDialog = false)
+                            restTimer = timer.copy(
+                                remainingSeconds = 0,
+                                isRunning = false,
+                                showDialog = false,
+                                shouldNotify = true
+                            )
                         )
                     } else {
                         state.copy(
@@ -149,7 +155,8 @@ class ActiveWorkoutViewModel(
                     totalSeconds = timer.totalSeconds + extraSeconds,
                     remainingSeconds = timer.remainingSeconds + extraSeconds,
                     isRunning = true,
-                    showDialog = true
+                    showDialog = true,
+                    shouldNotify = false
                 )
             )
         }
@@ -173,6 +180,14 @@ class ActiveWorkoutViewModel(
             val timer = state.restTimer ?: return@update state
             if (timer.showDialog) return@update state
             state.copy(restTimer = timer.copy(showDialog = true))
+        }
+    }
+
+    fun acknowledgeRestTimerAlert() {
+        _uiState.update { state ->
+            val timer = state.restTimer ?: return@update state
+            if (!timer.shouldNotify) return@update state
+            state.copy(restTimer = timer.copy(shouldNotify = false))
         }
     }
 
@@ -534,7 +549,8 @@ data class RestTimerState(
     val totalSeconds: Int,
     val remainingSeconds: Int,
     val isRunning: Boolean,
-    val showDialog: Boolean
+    val showDialog: Boolean,
+    val shouldNotify: Boolean
 )
 
 data class ActiveWorkoutResult(
