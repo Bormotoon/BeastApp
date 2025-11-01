@@ -111,6 +111,18 @@ interface WorkoutLogDao {
     )
     suspend fun getSetLogAggregates(logIds: List<String>): List<WorkoutLogSetAggregate>
 
+    @Query(
+        """
+        SELECT workoutLogId, exerciseId,
+            SUM(COALESCE(weight, 0) * COALESCE(reps, 0)) AS totalVolume,
+            SUM(COALESCE(reps, 0)) AS totalReps
+        FROM set_logs
+        WHERE workoutLogId IN (:logIds)
+        GROUP BY workoutLogId, exerciseId
+        """
+    )
+    suspend fun getExerciseVolumeAggregates(logIds: List<String>): List<WorkoutLogExerciseAggregate>
+
     @Query("SELECT * FROM workout_logs WHERE dateEpochMillis BETWEEN :startMillis AND :endMillis ORDER BY dateEpochMillis")
     suspend fun getLogsBetween(startMillis: Long, endMillis: Long): List<WorkoutLogEntity>
 
@@ -148,10 +160,47 @@ interface ProfileDao {
 
     @Query("SELECT DISTINCT dateEpochDay FROM personal_records WHERE dateEpochDay IN (:epochDays)")
     suspend fun getPersonalRecordDates(epochDays: List<Long>): List<Long>
+
+    @Query(
+        """
+        SELECT pr.exerciseId,
+               pr.weight,
+               pr.reps,
+               pr.estimated1RM AS estimatedOneRm,
+               pr.dateEpochDay,
+               ex.name AS exerciseName
+        FROM personal_records pr
+        INNER JOIN (
+            SELECT exerciseId, MAX(estimated1RM) AS bestOneRm
+            FROM personal_records
+            GROUP BY exerciseId
+        ) best ON pr.exerciseId = best.exerciseId AND pr.estimated1RM = best.bestOneRm
+        LEFT JOIN exercises ex ON pr.exerciseId = ex.id
+        ORDER BY pr.estimated1RM DESC
+        LIMIT :limit
+        """
+    )
+    suspend fun getTopPersonalRecords(limit: Int): List<PersonalRecordWithExercise>
 }
 
 data class WorkoutLogSetAggregate(
     val workoutLogId: String,
     val setCount: Int,
     val exerciseCount: Int
+)
+
+data class WorkoutLogExerciseAggregate(
+    val workoutLogId: String,
+    val exerciseId: String,
+    val totalVolume: Double,
+    val totalReps: Int
+)
+
+data class PersonalRecordWithExercise(
+    val exerciseId: String,
+    val weight: Double,
+    val reps: Int,
+    val estimatedOneRm: Double,
+    val dateEpochDay: Long,
+    val exerciseName: String?
 )

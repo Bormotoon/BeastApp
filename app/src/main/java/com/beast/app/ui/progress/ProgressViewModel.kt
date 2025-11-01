@@ -5,21 +5,28 @@ import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.beast.app.data.db.DatabaseProvider
+import com.beast.app.data.db.ExerciseEntity
+import com.beast.app.data.db.PersonalRecordWithExercise
 import com.beast.app.data.db.WorkoutEntity
 import com.beast.app.data.db.WorkoutLogEntity
+import com.beast.app.data.db.WorkoutLogExerciseAggregate
 import com.beast.app.data.repo.ProgramRepository
 import com.beast.app.data.repo.ProfileRepository
 import com.beast.app.data.repo.WorkoutRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 import kotlin.math.roundToInt
+
+private const val UNKNOWN_MUSCLE_GROUP = "Прочие"
 
 class ProgressViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -67,12 +74,21 @@ class ProgressViewModel(application: Application) : AndroidViewModel(application
             val workoutIds = logs.map { it.workoutId }.distinct()
             val workouts = workoutRepository.getWorkoutsByIds(workoutIds).associateBy { it.id }
 
+            val exerciseAggregates = workoutRepository.getExerciseVolumeAggregates(logs.map { it.id })
+            val exerciseIds = exerciseAggregates.map { it.exerciseId }.distinct()
+            val exercises = workoutRepository.getExercisesByIds(exerciseIds).associateBy { it.id }
+            val aggregatesByLog = exerciseAggregates.groupBy { it.workoutLogId }
+            val personalRecords = profileRepository.getTopPersonalRecords(30)
+
             val data = LoadedData(
                 logs = logs,
                 weightUnit = weightUnit,
                 programSummary = programSummary,
                 startDate = startDate,
-                workoutsById = workouts
+                workoutsById = workouts,
+                exerciseAggregatesByLog = aggregatesByLog,
+                exercisesById = exercises,
+                personalRecords = personalRecords
             )
 
             loadedData = data
@@ -155,6 +171,20 @@ class ProgressViewModel(application: Application) : AndroidViewModel(application
             .toSet()
         val (currentStreak, bestStreak) = calculateStreaks(completedDatesAll)
 
+        val muscleDistribution = buildMuscleDistribution(completedLogs, data.workoutsById)
+        val muscleVolume = buildMuscleVolume(completedLogs, data.workoutsById)
+        val exerciseVolume = buildExerciseVolume(completedLogs, data)
+        val heatmap = buildHeatmap(completedLogs, zone)
+        val volumeSeries = buildVolumeSeries(completedLogs, zone)
+        val records = buildRecordSummaries(
+            period = period,
+            filteredLogs = filteredLogs,
+            data = data,
+            zone = zone,
+            dateFormatter = dateFormatter,
+            locale = locale
+        )
+
         val recent = sortedLogs.take(5).map { log ->
             val localDate = Instant.ofEpochMilli(log.dateEpochMillis).atZone(zone).toLocalDate()
             RecentWorkoutSummary(
@@ -198,8 +228,202 @@ class ProgressViewModel(application: Application) : AndroidViewModel(application
             averageVolume = averageVolume,
             weightUnit = data.weightUnit,
             programName = data.programSummary?.program?.name,
-            recentWorkouts = recent
+            recentWorkouts = recent,
+            muscleDistribution = muscleDistribution,
+            heatmap = heatmap,
+            volumeSeries = volumeSeries,
+            muscleVolume = muscleVolume,
+            exerciseVolume = exerciseVolume,
+            records = records
         )
+    }
+
+    private fun buildMuscleDistribution(
+        logs: List<WorkoutLogEntity>,
+        workouts: Map<String, WorkoutEntity>
+    ): List<MuscleGroupShare> {
+        if (logs.isEmpty()) return emptyList()
+        val counts = linkedMapOf<String, Int>()
+        logs.forEach { log ->
+            val groups = workouts[log.workoutId]?.targetMuscleGroups.orEmpty()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+            if (groups.isEmpty()) {
+                counts.merge(UNKNOWN_MUSCLE_GROUP, 1, Int::plus)
+            } else {
+                groups.forEach { group -> counts.merge(group, 1, Int::plus) }
+            }
+        }
+        val total = counts.values.sum()
+        if (total == 0) return emptyList()
+        return counts.entries
+            .sortedByDescending { it.value }
+            .map { (group, count) ->
+                MuscleGroupShare(
+                    group = group,
+                    occurrences = count,
+                    percentage = count * 100.0 / total
+                )
+            }
+    }
+
+    private fun buildMuscleVolume(
+        logs: List<WorkoutLogEntity>,
+        workouts: Map<String, WorkoutEntity>
+    ): List<VolumeBreakdownEntry> {
+        if (logs.isEmpty()) return emptyList()
+        val totals = mutableMapOf<String, Double>()
+        logs.forEach { log ->
+            val totalVolume = log.totalVolume
+            if (totalVolume <= 0.0) return@forEach
+            val groups = workouts[log.workoutId]?.targetMuscleGroups.orEmpty()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+            if (groups.isEmpty()) {
+                totals.merge(UNKNOWN_MUSCLE_GROUP, totalVolume, Double::plus)
+            } else {
+                val share = totalVolume / groups.size
+                groups.forEach { group -> totals.merge(group, share, Double::plus) }
+            }
+        }
+        return totals.entries
+            .sortedByDescending { it.value }
+            .map { (group, volume) ->
+                VolumeBreakdownEntry(label = group, volume = volume)
+            }
+    }
+
+    private fun buildExerciseVolume(
+        logs: List<WorkoutLogEntity>,
+        data: LoadedData
+    ): List<VolumeBreakdownEntry> {
+        if (logs.isEmpty()) return emptyList()
+        val totals = mutableMapOf<String, Double>()
+        logs.forEach { log ->
+            val aggregates = data.exerciseAggregatesByLog[log.id] ?: return@forEach
+            aggregates.forEach { aggregate ->
+                if (aggregate.totalVolume > 0.0) {
+                    totals.merge(aggregate.exerciseId, aggregate.totalVolume, Double::plus)
+                }
+            }
+        }
+        if (totals.isEmpty()) return emptyList()
+        return totals.entries
+            .sortedByDescending { it.value }
+            .map { (exerciseId, volume) ->
+                val label = data.exercisesById[exerciseId]?.name ?: exerciseId
+                VolumeBreakdownEntry(label = label, volume = volume)
+            }
+    }
+
+    private fun buildHeatmap(
+        logs: List<WorkoutLogEntity>,
+        zone: ZoneId
+    ): List<HeatmapDay> {
+        if (logs.isEmpty()) return emptyList()
+        val completed = logs
+            .filter { it.status.equals("COMPLETED", ignoreCase = true) }
+            .groupBy { Instant.ofEpochMilli(it.dateEpochMillis).atZone(zone).toLocalDate() }
+            .mapValues { entry -> entry.value.sumOf { log -> log.totalVolume } }
+
+        if (completed.isEmpty()) return emptyList()
+
+        val weeksToShow = 12
+        val maxDate = completed.keys.maxOrNull() ?: LocalDate.now(zone)
+        val alignedEnd = maxDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY))
+        val alignedStart = alignedEnd.minusWeeks(weeksToShow.toLong() - 1)
+            .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+
+        val maxVolume = completed.values.maxOrNull()?.takeIf { it > 0.0 } ?: return emptyList()
+
+        val days = mutableListOf<HeatmapDay>()
+        var cursor = alignedStart
+        val totalDays = weeksToShow * 7
+        repeat(totalDays) {
+            val amount = completed[cursor] ?: 0.0
+            val intensity = calculateIntensity(amount, maxVolume)
+            days += HeatmapDay(date = cursor, amount = amount, intensity = intensity)
+            cursor = cursor.plusDays(1)
+        }
+        return days
+    }
+
+    private fun buildVolumeSeries(
+        logs: List<WorkoutLogEntity>,
+        zone: ZoneId
+    ): List<VolumePoint> {
+        if (logs.isEmpty()) return emptyList()
+        val grouped = logs.filter { it.status.equals("COMPLETED", ignoreCase = true) }
+            .groupBy { log ->
+                Instant.ofEpochMilli(log.dateEpochMillis).atZone(zone).toLocalDate()
+                    .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            }
+        if (grouped.isEmpty()) return emptyList()
+        return grouped.entries
+            .sortedBy { it.key }
+            .map { (weekStart, items) ->
+                VolumePoint(
+                    weekStart = weekStart,
+                    totalVolume = items.sumOf { it.totalVolume },
+                    workouts = items.size
+                )
+            }
+    }
+
+    private fun buildRecordSummaries(
+        period: ProgressPeriod,
+        filteredLogs: List<WorkoutLogEntity>,
+        data: LoadedData,
+        zone: ZoneId,
+        dateFormatter: DateTimeFormatter,
+        locale: Locale
+    ): List<RecordSummary> {
+        if (data.personalRecords.isEmpty()) return emptyList()
+        val today = LocalDate.now(zone)
+        val periodStart = when (period) {
+            ProgressPeriod.WEEK -> today.minusDays(6)
+            ProgressPeriod.MONTH -> today.minusDays(29)
+            ProgressPeriod.BLOCK -> filteredLogs.minOfOrNull {
+                Instant.ofEpochMilli(it.dateEpochMillis).atZone(zone).toLocalDate()
+            }
+            ProgressPeriod.PROGRAM -> today.minusDays(30)
+        }
+        val orderedRecords = data.personalRecords.sortedByDescending { it.estimatedOneRm }
+        return orderedRecords.map { record ->
+            val recordDate = LocalDate.ofEpochDay(record.dateEpochDay)
+            val label = recordDate.format(dateFormatter).replaceFirstChar { char ->
+                if (char.isLowerCase()) char.titlecase(locale) else char.toString()
+            }
+            val exerciseName = when {
+                !record.exerciseName.isNullOrBlank() -> record.exerciseName
+                else -> data.exercisesById[record.exerciseId]?.name ?: record.exerciseId
+            }
+            val isRecent = periodStart?.let { !recordDate.isBefore(it) } ?: false
+            RecordSummary(
+                exerciseId = record.exerciseId,
+                exerciseName = exerciseName,
+                weight = record.weight,
+                weightUnit = data.weightUnit,
+                reps = record.reps,
+                estimatedOneRm = record.estimatedOneRm,
+                lastAchieved = recordDate,
+                lastAchievedLabel = label,
+                isRecent = isRecent
+            )
+        }
+    }
+
+    private fun calculateIntensity(amount: Double, max: Double): Int {
+        if (amount <= 0.0 || max <= 0.0) return 0
+        val ratio = amount / max
+        return when {
+            ratio >= 0.75 -> 4
+            ratio >= 0.5 -> 3
+            ratio >= 0.25 -> 2
+            else -> 1
+        }
     }
 
     private fun filterLogsForPeriod(
@@ -286,7 +510,10 @@ class ProgressViewModel(application: Application) : AndroidViewModel(application
         val weightUnit: String,
         val programSummary: ProgramRepository.ProgramSummary?,
         val startDate: LocalDate?,
-        val workoutsById: Map<String, WorkoutEntity>
+        val workoutsById: Map<String, WorkoutEntity>,
+        val exerciseAggregatesByLog: Map<String, List<WorkoutLogExerciseAggregate>>,
+        val exercisesById: Map<String, ExerciseEntity>,
+        val personalRecords: List<PersonalRecordWithExercise>
     )
 
     private fun formatStatus(rawStatus: String): String {
@@ -347,7 +574,13 @@ data class ProgressStats(
     val averageVolume: Double,
     val weightUnit: String,
     val programName: String?,
-    val recentWorkouts: List<RecentWorkoutSummary>
+    val recentWorkouts: List<RecentWorkoutSummary>,
+    val muscleDistribution: List<MuscleGroupShare>,
+    val heatmap: List<HeatmapDay>,
+    val volumeSeries: List<VolumePoint>,
+    val muscleVolume: List<VolumeBreakdownEntry>,
+    val exerciseVolume: List<VolumeBreakdownEntry>,
+    val records: List<RecordSummary>
 )
 
 data class RecentWorkoutSummary(
@@ -370,3 +603,38 @@ enum class ProgressPeriod(val displayName: String) {
     BLOCK("Блок"),
     PROGRAM("Вся программа")
 }
+
+data class MuscleGroupShare(
+    val group: String,
+    val occurrences: Int,
+    val percentage: Double
+)
+
+data class HeatmapDay(
+    val date: LocalDate,
+    val amount: Double,
+    val intensity: Int
+)
+
+data class VolumePoint(
+    val weekStart: LocalDate,
+    val totalVolume: Double,
+    val workouts: Int
+)
+
+data class VolumeBreakdownEntry(
+    val label: String,
+    val volume: Double
+)
+
+data class RecordSummary(
+    val exerciseId: String,
+    val exerciseName: String,
+    val weight: Double,
+    val weightUnit: String,
+    val reps: Int,
+    val estimatedOneRm: Double,
+    val lastAchieved: LocalDate,
+    val lastAchievedLabel: String,
+    val isRecent: Boolean
+)

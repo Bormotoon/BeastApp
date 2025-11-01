@@ -36,5 +36,9 @@ class ProfileRepository(
         if (epochDays.isEmpty()) return@withContext emptySet()
         profileDao.getPersonalRecordDates(epochDays).toSet()
     }
+
+    suspend fun getTopPersonalRecords(limit: Int): List<PersonalRecordWithExercise> = withContext(Dispatchers.IO) {
+        profileDao.getTopPersonalRecords(limit)
+    }
 }
 

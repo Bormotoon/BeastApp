@@ -85,6 +85,11 @@ class WorkoutRepository private constructor(
         workoutLogDao.getSetLogAggregates(logIds).associateBy { it.workoutLogId }
     }
 
+    suspend fun getExerciseVolumeAggregates(logIds: List<String>): List<WorkoutLogExerciseAggregate> = withContext(Dispatchers.IO) {
+        if (logIds.isEmpty()) return@withContext emptyList()
+        workoutLogDao.getExerciseVolumeAggregates(logIds)
+    }
+
     suspend fun getLogsBetween(startMillis: Long, endMillis: Long): List<WorkoutLogEntity> = withContext(Dispatchers.IO) {
         if (startMillis > endMillis) return@withContext emptyList()
         workoutLogDao.getLogsBetween(startMillis, endMillis)
@@ -93,6 +98,11 @@ class WorkoutRepository private constructor(
     suspend fun getWorkoutsByIds(workoutIds: List<String>): List<WorkoutEntity> = withContext(Dispatchers.IO) {
         if (workoutIds.isEmpty()) return@withContext emptyList()
         workoutDao.getWorkoutsByIds(workoutIds)
+    }
+
+    suspend fun getExercisesByIds(exerciseIds: List<String>): List<ExerciseEntity> = withContext(Dispatchers.IO) {
+        if (exerciseIds.isEmpty()) return@withContext emptyList()
+        workoutDao.getExercisesByIds(exerciseIds)
     }
 
     suspend fun getLatestLogsForWorkouts(workoutIds: List<String>): Map<String, WorkoutLogEntity> = withContext(Dispatchers.IO) {
