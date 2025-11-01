@@ -101,7 +101,7 @@ class ActiveWorkoutViewModel(
         }
     }
 
-    fun startRestTimer(totalSeconds: Int = 60) {
+    fun startRestTimer(totalSeconds: Int = 60, showDialog: Boolean = true) {
         restTimerJob?.cancel()
         if (totalSeconds <= 0) {
             _uiState.update { it.copy(restTimer = null) }
@@ -112,7 +112,8 @@ class ActiveWorkoutViewModel(
                 restTimer = RestTimerState(
                     totalSeconds = totalSeconds,
                     remainingSeconds = totalSeconds,
-                    isRunning = true
+                    isRunning = true,
+                    showDialog = showDialog
                 )
             )
         }
@@ -127,7 +128,7 @@ class ActiveWorkoutViewModel(
                     if (nextValue <= 0) {
                         shouldStop = true
                         state.copy(
-                            restTimer = timer.copy(remainingSeconds = 0, isRunning = false)
+                            restTimer = timer.copy(remainingSeconds = 0, isRunning = false, showDialog = false)
                         )
                     } else {
                         state.copy(
@@ -147,7 +148,8 @@ class ActiveWorkoutViewModel(
                 restTimer = timer.copy(
                     totalSeconds = timer.totalSeconds + extraSeconds,
                     remainingSeconds = timer.remainingSeconds + extraSeconds,
-                    isRunning = true
+                    isRunning = true,
+                    showDialog = true
                 )
             )
         }
@@ -156,6 +158,22 @@ class ActiveWorkoutViewModel(
     fun skipRest() {
         restTimerJob?.cancel()
         _uiState.update { it.copy(restTimer = null) }
+    }
+
+    fun hideRestDialog() {
+        _uiState.update { state ->
+            val timer = state.restTimer ?: return@update state
+            if (!timer.showDialog) return@update state
+            state.copy(restTimer = timer.copy(showDialog = false))
+        }
+    }
+
+    fun showRestDialog() {
+        _uiState.update { state ->
+            val timer = state.restTimer ?: return@update state
+            if (timer.showDialog) return@update state
+            state.copy(restTimer = timer.copy(showDialog = true))
+        }
     }
 
     fun updateWeightInput(exerciseId: String, setIndex: Int, rawValue: String) {
@@ -206,8 +224,15 @@ class ActiveWorkoutViewModel(
     }
 
     fun toggleSetCompleted(exerciseId: String, setIndex: Int) {
+        val currentSet = _uiState.value.exercises
+            .firstOrNull { it.id == exerciseId }
+            ?.sets
+            ?.getOrNull(setIndex)
+            ?: return
+
+        val markCompleted = !currentSet.completed
+
         _uiState.updateSet(exerciseId, setIndex) { set ->
-            val markCompleted = !set.completed
             val filledWeight = if (markCompleted && set.weightInput.isBlank() && set.previousWeight != null) {
                 formatWeight(set.previousWeight)
             } else {
@@ -223,6 +248,10 @@ class ActiveWorkoutViewModel(
                 weightInput = filledWeight,
                 repsInput = filledReps
             )
+        }
+
+        if (markCompleted) {
+            startRestTimer(showDialog = true)
         }
     }
 
@@ -504,7 +533,8 @@ data class ActiveSetState(
 data class RestTimerState(
     val totalSeconds: Int,
     val remainingSeconds: Int,
-    val isRunning: Boolean
+    val isRunning: Boolean,
+    val showDialog: Boolean
 )
 
 data class ActiveWorkoutResult(

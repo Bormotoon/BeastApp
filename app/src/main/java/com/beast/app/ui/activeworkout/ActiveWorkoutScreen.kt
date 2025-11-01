@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -57,6 +58,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.window.Dialog
 
 @Composable
 fun ActiveWorkoutRoute(
@@ -82,6 +84,8 @@ fun ActiveWorkoutRoute(
         onStartRest = { viewModel.startRestTimer() },
         onExtendRest = viewModel::extendRest,
         onSkipRest = viewModel::skipRest,
+        onShowRestDialog = viewModel::showRestDialog,
+        onHideRestDialog = viewModel::hideRestDialog,
         onFinishRequest = viewModel::requestFinish,
         onCancelFinish = viewModel::cancelFinish,
         onConfirmFinish = viewModel::confirmFinish,
@@ -109,6 +113,8 @@ private fun ActiveWorkoutScreen(
     onStartRest: () -> Unit,
     onExtendRest: (Int) -> Unit,
     onSkipRest: () -> Unit,
+    onShowRestDialog: () -> Unit,
+    onHideRestDialog: () -> Unit,
     onFinishRequest: () -> Unit,
     onCancelFinish: () -> Unit,
     onConfirmFinish: () -> Unit,
@@ -211,7 +217,8 @@ private fun ActiveWorkoutScreen(
                             restTimer = state.restTimer,
                             onStartRest = onStartRest,
                             onExtendRest = onExtendRest,
-                            onSkipRest = onSkipRest
+                            onSkipRest = onSkipRest,
+                            onShowDialog = onShowRestDialog
                         )
                     }
                     item {
@@ -244,6 +251,16 @@ private fun ActiveWorkoutScreen(
                     Text("Отмена")
                 }
             }
+        )
+    }
+
+    val restTimer = state.restTimer
+    if (restTimer?.showDialog == true) {
+        RestTimerDialog(
+            restTimer = restTimer,
+            onExtendRest = onExtendRest,
+            onSkipRest = onSkipRest,
+            onHide = onHideRestDialog
         )
     }
 }
@@ -595,7 +612,8 @@ private fun RestTimerCard(
     restTimer: RestTimerState?,
     onStartRest: () -> Unit,
     onExtendRest: (Int) -> Unit,
-    onSkipRest: () -> Unit
+    onSkipRest: () -> Unit,
+    onShowDialog: () -> Unit
 ) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -626,12 +644,70 @@ private fun RestTimerCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    OutlinedButton(onClick = { onExtendRest(15) }) {
+                    OutlinedButton(
+                        onClick = { onExtendRest(15) },
+                        modifier = Modifier.weight(1f)
+                    ) {
                         Text("+15 сек")
                     }
-                    OutlinedButton(onClick = onSkipRest) {
+                    OutlinedButton(onClick = onSkipRest, modifier = Modifier.weight(1f)) {
                         Text("Пропустить")
                     }
+                    OutlinedButton(onClick = onShowDialog, modifier = Modifier.weight(1f)) {
+                        Text("Развернуть")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RestTimerDialog(
+    restTimer: RestTimerState,
+    onExtendRest: (Int) -> Unit,
+    onSkipRest: () -> Unit,
+    onHide: () -> Unit
+) {
+    val progress = if (restTimer.totalSeconds == 0) 0f else restTimer.remainingSeconds.toFloat() / restTimer.totalSeconds
+    Dialog(onDismissRequest = onHide) {
+        Surface(shape = MaterialTheme.shapes.large) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                Text(text = "Отдых", style = MaterialTheme.typography.headlineSmall)
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.size(160.dp),
+                    strokeWidth = 8.dp,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+                Text(
+                    text = "${formatTime(restTimer.remainingSeconds)}",
+                    style = MaterialTheme.typography.displaySmall
+                )
+                Text(
+                    text = "Всего: ${formatTime(restTimer.totalSeconds)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(onClick = { onExtendRest(15) }, modifier = Modifier.weight(1f)) {
+                        Text("+15 сек")
+                    }
+                    OutlinedButton(onClick = onSkipRest, modifier = Modifier.weight(1f)) {
+                        Text("Пропустить")
+                    }
+                }
+                OutlinedButton(onClick = onHide, modifier = Modifier.fillMaxWidth()) {
+                    Text("Скрыть")
                 }
             }
         }
