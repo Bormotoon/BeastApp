@@ -7,6 +7,7 @@ package com.beast.app.ui.activeworkout
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,9 +29,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.outlined.MilitaryTech
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
@@ -407,12 +408,12 @@ private fun SetsTableHeader() {
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        TableHeaderCell(text = "#", weight = 0.5f)
-        TableHeaderCell(text = "Прошлое", weight = 1.2f)
-        TableHeaderCell(text = "Цель", weight = 0.8f)
+        TableHeaderCell(text = "#", weight = 0.6f)
+        TableHeaderCell(text = "Прошлое", weight = 1.3f)
+        TableHeaderCell(text = "Цель", weight = 0.9f)
         TableHeaderCell(text = "Вес", weight = 1.2f)
         TableHeaderCell(text = "Повторы", weight = 1.0f)
-        TableHeaderCell(text = "✔", weight = 0.5f, textAlign = TextAlign.Center)
+        TableHeaderCell(text = "Действие", weight = 1.3f, textAlign = TextAlign.Center)
     }
 }
 
@@ -439,49 +440,78 @@ private fun SetRow(
     onAdjustReps: (String, Int, Int) -> Unit,
     onToggleSetCompleted: (String, Int) -> Unit
 ) {
-    Row(
+    val backgroundColor = if (setState.completed) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val border = if (setState.isNewRecord) {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.secondary)
+    } else {
+        null
+    }
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp, horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+        shape = MaterialTheme.shapes.small,
+        color = backgroundColor,
+        tonalElevation = if (setState.completed) 2.dp else 0.dp,
+        border = border
     ) {
-        Text(
-            text = setState.setNumber.toString(),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(0.5f)
-        )
-        Text(
-            text = setState.previousSummary,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1.2f)
-        )
-        Text(
-            text = setState.goalReps ?: "—",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(0.8f)
-        )
-        StepField(
-            label = state.weightUnit.uppercase(),
-            value = setState.weightInput,
-            onValueChange = { onWeightChange(exerciseId, setIndex, it) },
-            onIncrement = { onAdjustWeight(exerciseId, setIndex, 1.0) },
-            onDecrement = { onAdjustWeight(exerciseId, setIndex, -1.0) },
-            modifier = Modifier.weight(1.2f)
-        )
-        StepField(
-            label = "Повт.",
-            value = setState.repsInput,
-            onValueChange = { onRepsChange(exerciseId, setIndex, it) },
-            onIncrement = { onAdjustReps(exerciseId, setIndex, 1) },
-            onDecrement = { onAdjustReps(exerciseId, setIndex, -1) },
-            modifier = Modifier.weight(1.0f),
-            allowDecimal = false
-        )
-        Checkbox(
-            checked = setState.completed,
-            onCheckedChange = { onToggleSetCompleted(exerciseId, setIndex) },
-            modifier = Modifier.weight(0.5f)
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = setState.setNumber.toString(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(0.6f)
+                )
+                Text(
+                    text = setState.previousSummary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1.3f)
+                )
+                Text(
+                    text = setState.goalReps ?: "—",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(0.9f)
+                )
+                StepField(
+                    label = state.weightUnit.uppercase(),
+                    value = setState.weightInput,
+                    onValueChange = { onWeightChange(exerciseId, setIndex, it) },
+                    onIncrement = { onAdjustWeight(exerciseId, setIndex, 1.0) },
+                    onDecrement = { onAdjustWeight(exerciseId, setIndex, -1.0) },
+                    modifier = Modifier.weight(1.2f)
+                )
+                StepField(
+                    label = "Повт.",
+                    value = setState.repsInput,
+                    onValueChange = { onRepsChange(exerciseId, setIndex, it) },
+                    onIncrement = { onAdjustReps(exerciseId, setIndex, 1) },
+                    onDecrement = { onAdjustReps(exerciseId, setIndex, -1) },
+                    modifier = Modifier.weight(1.0f),
+                    allowDecimal = false
+                )
+                FinishSetButton(
+                    completed = setState.completed,
+                    onToggle = { onToggleSetCompleted(exerciseId, setIndex) },
+                    modifier = Modifier.weight(1.3f)
+                )
+            }
+            if (setState.isNewRecord) {
+                RecordBadge()
+            }
+        }
     }
 }
 
@@ -522,6 +552,40 @@ private fun StepField(
             IconButton(onClick = onIncrement) {
                 Icon(Icons.Filled.Add, contentDescription = "Увеличить")
             }
+        }
+    }
+}
+
+@Composable
+private fun FinishSetButton(completed: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    if (completed) {
+        OutlinedButton(onClick = onToggle, modifier = modifier) {
+            Text("Сбросить")
+        }
+    } else {
+        Button(onClick = onToggle, modifier = modifier) {
+            Text("Завершить")
+        }
+    }
+}
+
+@Composable
+private fun RecordBadge() {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        shape = MaterialTheme.shapes.small
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(imageVector = Icons.Outlined.MilitaryTech, contentDescription = null)
+            Text(
+                text = "Новый рекорд!",
+                style = MaterialTheme.typography.labelMedium
+            )
         }
     }
 }

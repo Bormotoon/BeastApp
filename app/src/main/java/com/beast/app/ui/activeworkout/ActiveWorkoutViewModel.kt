@@ -207,7 +207,22 @@ class ActiveWorkoutViewModel(
 
     fun toggleSetCompleted(exerciseId: String, setIndex: Int) {
         _uiState.updateSet(exerciseId, setIndex) { set ->
-            set.copy(completed = !set.completed)
+            val markCompleted = !set.completed
+            val filledWeight = if (markCompleted && set.weightInput.isBlank() && set.previousWeight != null) {
+                formatWeight(set.previousWeight)
+            } else {
+                set.weightInput
+            }
+            val filledReps = if (markCompleted && set.repsInput.isBlank()) {
+                set.goalReps ?: set.previousReps?.toString() ?: ""
+            } else {
+                set.repsInput
+            }
+            set.copy(
+                completed = markCompleted,
+                weightInput = filledWeight,
+                repsInput = filledReps
+            )
         }
     }
 
@@ -223,7 +238,7 @@ class ActiveWorkoutViewModel(
             if (setIndex !in exercise.sets.indices) return@update state
             val updatedExercise = exercise.copy(
                 sets = exercise.sets.mapIndexed { idx, set ->
-                    if (idx == setIndex) transform(set) else set
+                    if (idx == setIndex) recalcRecord(transform(set)) else set
                 }
             )
             state.copy(
@@ -232,6 +247,23 @@ class ActiveWorkoutViewModel(
                 }
             )
         }
+    }
+
+    private fun recalcRecord(set: ActiveSetState): ActiveSetState {
+        val currentVolume = computeCurrentVolume(set)
+        val baseline = set.previousVolume ?: 0.0
+        val isRecord = set.completed && currentVolume != null && currentVolume > baseline
+        return if (set.isNewRecord == isRecord) set else set.copy(isNewRecord = isRecord)
+    }
+
+    private fun computeCurrentVolume(set: ActiveSetState): Double? {
+        val weight = set.weightInput.toDoubleOrNull() ?: set.previousWeight
+        val reps = set.repsInput.toIntOrNull()
+            ?: set.goalReps?.toIntOrNull()
+            ?: set.previousReps
+        if (weight == null || reps == null) return null
+        if (weight <= 0.0 || reps <= 0) return null
+        return weight * reps
     }
 
     private fun startWorkoutTimer() {
@@ -291,6 +323,7 @@ class ActiveWorkoutViewModel(
             val sets = (0 until totalSets).map { index ->
                 val goal = targetRepsList.getOrNull(index)
                 val prev = previousLogs.getOrNull(index)
+                val prevVolume = if (prev?.weight != null && prev.reps != null) prev.weight * prev.reps else null
                 ActiveSetState(
                     setNumber = index + 1,
                     previousWeight = prev?.weight,
@@ -299,7 +332,9 @@ class ActiveWorkoutViewModel(
                     goalReps = goal,
                     weightInput = prev?.weight?.let { formatWeight(it) } ?: "",
                     repsInput = goal ?: prev?.reps?.toString() ?: "",
-                    completed = false
+                    completed = false,
+                    previousVolume = prevVolume,
+                    isNewRecord = false
                 )
             }
 
@@ -461,7 +496,9 @@ data class ActiveSetState(
     val goalReps: String?,
     val weightInput: String,
     val repsInput: String,
-    val completed: Boolean
+    val completed: Boolean,
+    val previousVolume: Double?,
+    val isNewRecord: Boolean
 )
 
 data class RestTimerState(
