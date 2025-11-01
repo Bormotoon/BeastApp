@@ -15,11 +15,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.FitnessCenter
+import androidx.compose.material.icons.outlined.MilitaryTech
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -52,6 +54,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 fun WorkoutDetailRoute(
     onBack: () -> Unit,
     onStartWorkout: (String) -> Unit,
+    onViewWorkoutLog: (String) -> Unit = {},
     viewModel: WorkoutDetailViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -59,6 +62,7 @@ fun WorkoutDetailRoute(
         state = state,
         onBack = onBack,
         onStartWorkout = onStartWorkout,
+        onViewLog = onViewWorkoutLog,
         onRetry = viewModel::refresh
     )
 }
@@ -68,6 +72,7 @@ private fun WorkoutDetailScreen(
     state: WorkoutDetailUiState,
     onBack: () -> Unit,
     onStartWorkout: (String) -> Unit,
+    onViewLog: (String) -> Unit,
     onRetry: () -> Unit
 ) {
     Scaffold(
@@ -125,7 +130,8 @@ private fun WorkoutDetailScreen(
                             .fillMaxSize()
                             .padding(innerPadding),
                         state = state,
-                        onStartWorkout = { onStartWorkout(workoutId) }
+                        onStartWorkout = { onStartWorkout(workoutId) },
+                        onViewLog = onViewLog
                     )
                 }
             }
@@ -137,7 +143,8 @@ private fun WorkoutDetailScreen(
 private fun WorkoutDetailContent(
     modifier: Modifier,
     state: WorkoutDetailUiState,
-    onStartWorkout: () -> Unit
+    onStartWorkout: () -> Unit,
+    onViewLog: (String) -> Unit
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val tabs = listOf("Упражнения", "История")
@@ -179,8 +186,18 @@ private fun WorkoutDetailContent(
                     }
                 }
                 else -> {
-                    item {
-                        HistoryPlaceholder()
+                    if (state.history.isEmpty()) {
+                        item {
+                            HistoryEmptyState()
+                        }
+                    } else {
+                        items(state.history, key = { it.id }) { historyItem ->
+                            HistoryCard(
+                                item = historyItem,
+                                onViewLog = { onViewLog(historyItem.id) },
+                                onRepeat = onStartWorkout
+                            )
+                        }
                     }
                 }
             }
@@ -348,7 +365,7 @@ private fun ExerciseCard(model: WorkoutExerciseUiModel) {
 }
 
 @Composable
-private fun HistoryPlaceholder() {
+private fun HistoryEmptyState() {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
@@ -362,12 +379,125 @@ private fun HistoryPlaceholder() {
                 contentDescription = null
             )
             Text(
-                text = "История тренировок появится в следующем обновлении",
+                text = "Пока нет завершённых сессий. После тренировки здесь появится история.",
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Composable
+private fun HistoryCard(
+    item: WorkoutHistoryItemUiModel,
+    onViewLog: () -> Unit,
+    onRepeat: () -> Unit
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.dateLabel,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = item.statusLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (item.isBestVolume) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.MilitaryTech,
+                                contentDescription = null
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Лучший объём",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
+                }
+            }
+
+            item.durationLabel?.let {
+                HistoryInfoRow(label = "Длительность", value = it)
+            }
+            item.volumeLabel?.let {
+                HistoryInfoRow(label = "Объём", value = it)
+            }
+            item.repsLabel?.let {
+                HistoryInfoRow(label = "Повторения", value = it)
+            }
+            item.caloriesLabel?.let {
+                HistoryInfoRow(label = "Калории", value = it)
+            }
+            item.ratingLabel?.let {
+                HistoryInfoRow(label = "Оценка", value = it)
+            }
+
+            item.notesPreview?.let {
+                Text(
+                    text = "Заметка: $it",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(onClick = onViewLog, modifier = Modifier.weight(1f)) {
+                    Text("Просмотр")
+                }
+                Button(
+                    onClick = onRepeat,
+                    enabled = item.canRepeat,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Повторить")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryInfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.End
+        )
     }
 }
 

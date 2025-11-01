@@ -3,8 +3,8 @@ package com.beast.app.ui.workoutdetail
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.viewModelScope
 import com.beast.app.data.db.DatabaseProvider
 import com.beast.app.data.repo.ProgramRepository
 import com.beast.app.data.repo.ProfileRepository
@@ -72,6 +72,8 @@ class WorkoutDetailViewModel(
 
         val logs = workoutRepository.getLogsForWorkout(workoutId)
         val latestLog = logs.firstOrNull()
+        val weightUnit = profile?.weightUnit ?: "kg"
+        val bestVolume = logs.maxOfOrNull { it.totalVolume } ?: 0.0
 
         val zone = ZoneId.systemDefault()
         val formatter = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.getDefault())
@@ -80,6 +82,24 @@ class WorkoutDetailViewModel(
             Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
         }
         val lastCompletedLabel = lastCompletedDate?.format(formatter)
+
+        val historyItems = logs.map { log ->
+            val logDate = Instant.ofEpochMilli(log.dateEpochMillis).atZone(zone)
+            val isBestVolume = log.totalVolume > 0 && log.totalVolume >= bestVolume
+            WorkoutHistoryItemUiModel(
+                id = log.id,
+                dateLabel = logDate.format(DateTimeFormatter.ofPattern("d MMM yyyy, EEE", Locale.getDefault())),
+                statusLabel = formatStatus(log.status),
+                durationLabel = formatDurationLabel(log.totalDuration),
+                volumeLabel = formatVolumeLabel(log.totalVolume, weightUnit),
+                repsLabel = formatRepsLabel(log.totalReps),
+                caloriesLabel = log.calories?.takeIf { it > 0 }?.let { "$it ккал" },
+                ratingLabel = formatRatingLabel(log.rating),
+                notesPreview = log.notes?.let(::formatNotesPreview),
+                isBestVolume = isBestVolume,
+                canRepeat = log.status.equals("COMPLETED", ignoreCase = true)
+            )
+        }
 
         val exercises = workoutWithExercises.mappings.sortedBy { it.orderIndex }.mapNotNull { mapping ->
             val exercise = workoutWithExercises.exercises.firstOrNull { it.id == mapping.exerciseId }
@@ -109,8 +129,62 @@ class WorkoutDetailViewModel(
             muscleGroups = workoutWithExercises.workout.targetMuscleGroups,
             exerciseCount = exercises.size,
             exercises = exercises,
-            lastCompletedLabel = lastCompletedLabel
+            lastCompletedLabel = lastCompletedLabel,
+            weightUnit = weightUnit,
+            history = historyItems
         )
+    }
+
+    private fun formatDurationLabel(totalMinutes: Int): String? {
+        if (totalMinutes <= 0) return null
+        val hours = totalMinutes / 60
+        val minutes = totalMinutes % 60
+        return buildString {
+            if (hours > 0) {
+                append(hours)
+                append(" ч")
+            }
+            if (minutes > 0) {
+                if (isNotEmpty()) append(' ')
+                append(minutes)
+                append(" мин")
+            }
+        }.ifBlank { "$totalMinutes мин" }
+    }
+
+    private fun formatVolumeLabel(volume: Double, weightUnit: String): String? {
+        if (volume <= 0.0) return null
+        val formatted = if (volume % 1.0 == 0.0) {
+            volume.toLong().toString()
+        } else {
+            String.format(Locale.getDefault(), "%.1f", volume)
+        }
+        val suffix = if (weightUnit.equals("lbs", ignoreCase = true)) " фунтов" else " кг"
+        return formatted + suffix
+    }
+
+    private fun formatRepsLabel(totalReps: Int): String? {
+        if (totalReps <= 0) return null
+        return "$totalReps повт."
+    }
+
+    private fun formatStatus(rawStatus: String): String {
+        return when (rawStatus.uppercase(Locale.getDefault())) {
+            "COMPLETED" -> "Завершена"
+            "INCOMPLETE" -> "Не завершена"
+            else -> rawStatus
+        }
+    }
+
+    private fun formatRatingLabel(rating: Int?): String? {
+        val value = rating ?: return null
+        if (value <= 0) return null
+        return "$value/5"
+    }
+
+    private fun formatNotesPreview(notes: String): String {
+        val sanitized = notes.trim().replace('\n', ' ')
+        return if (sanitized.length <= 120) sanitized else sanitized.take(117) + "..."
     }
 }
 
@@ -125,7 +199,9 @@ data class WorkoutDetailUiState(
     val exerciseCount: Int = 0,
     val lastCompletedLabel: String? = null,
     val exercises: List<WorkoutExerciseUiModel> = emptyList(),
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val weightUnit: String = "kg",
+    val history: List<WorkoutHistoryItemUiModel> = emptyList()
 )
 
 data class WorkoutExerciseUiModel(
@@ -140,4 +216,18 @@ data class WorkoutExerciseUiModel(
     val equipment: List<String>,
     val instructions: String?,
     val videoUrl: String?
+)
+
+data class WorkoutHistoryItemUiModel(
+    val id: String,
+    val dateLabel: String,
+    val statusLabel: String,
+    val durationLabel: String?,
+    val volumeLabel: String?,
+    val repsLabel: String?,
+    val caloriesLabel: String?,
+    val ratingLabel: String?,
+    val notesPreview: String?,
+    val isBestVolume: Boolean,
+    val canRepeat: Boolean
 )
