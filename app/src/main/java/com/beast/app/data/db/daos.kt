@@ -92,11 +92,27 @@ interface WorkoutLogDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSetLogs(logs: List<SetLogEntity>)
 
+    @Query("SELECT * FROM workout_logs ORDER BY dateEpochMillis DESC")
+    suspend fun getAllWorkoutLogs(): List<WorkoutLogEntity>
+
     @Query("SELECT * FROM workout_logs WHERE workoutId = :workoutId ORDER BY dateEpochMillis DESC")
     suspend fun getLogsForWorkout(workoutId: String): List<WorkoutLogEntity>
 
     @Query("SELECT * FROM set_logs WHERE workoutLogId = :workoutLogId ORDER BY setNumber")
     suspend fun getSetLogs(workoutLogId: String): List<SetLogEntity>
+
+    @Query(
+        """
+        SELECT workoutLogId, COUNT(*) AS setCount, COUNT(DISTINCT exerciseId) AS exerciseCount
+        FROM set_logs
+        WHERE workoutLogId IN (:logIds)
+        GROUP BY workoutLogId
+        """
+    )
+    suspend fun getSetLogAggregates(logIds: List<String>): List<WorkoutLogSetAggregate>
+
+    @Query("SELECT * FROM workout_logs WHERE dateEpochMillis BETWEEN :startMillis AND :endMillis ORDER BY dateEpochMillis")
+    suspend fun getLogsBetween(startMillis: Long, endMillis: Long): List<WorkoutLogEntity>
 
     @Query(
         """
@@ -129,4 +145,13 @@ interface ProfileDao {
 
     @Query("SELECT * FROM user_profile WHERE id = 1")
     suspend fun getProfile(): UserProfileEntity?
+
+    @Query("SELECT DISTINCT dateEpochDay FROM personal_records WHERE dateEpochDay IN (:epochDays)")
+    suspend fun getPersonalRecordDates(epochDays: List<Long>): List<Long>
 }
+
+data class WorkoutLogSetAggregate(
+    val workoutLogId: String,
+    val setCount: Int,
+    val exerciseCount: Int
+)

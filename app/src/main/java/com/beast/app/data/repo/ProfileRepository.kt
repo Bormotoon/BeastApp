@@ -31,5 +31,10 @@ class ProfileRepository(
     suspend fun insertPersonalRecord(entry: PersonalRecordEntity) = withContext(Dispatchers.IO) {
         profileDao.insertPersonalRecord(entry)
     }
+
+    suspend fun getPersonalRecordDates(epochDays: List<Long>): Set<Long> = withContext(Dispatchers.IO) {
+        if (epochDays.isEmpty()) return@withContext emptySet()
+        profileDao.getPersonalRecordDates(epochDays).toSet()
+    }
 }
 

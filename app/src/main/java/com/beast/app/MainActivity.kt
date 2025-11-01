@@ -41,13 +41,19 @@ import androidx.navigation.compose.rememberNavController
 import com.beast.app.data.db.DatabaseProvider
 import com.beast.app.data.repo.ProgramRepository
 import com.beast.app.domain.usecase.ImportProgramUseCase
+import com.beast.app.ui.activeworkout.ActiveWorkoutResult
+import com.beast.app.ui.activeworkout.ActiveWorkoutRoute
+import com.beast.app.ui.calendar.CalendarRoute
 import com.beast.app.ui.dashboard.DashboardRoute
 import com.beast.app.ui.onboarding.OnboardingScreen
 import com.beast.app.ui.program.ProgramRoute
 import com.beast.app.ui.program.ProgramSelectionScreen
 import com.beast.app.ui.theme.BeastAppTheme
-import com.beast.app.ui.activeworkout.ActiveWorkoutRoute
+import com.beast.app.ui.progress.ProgressRoute
+import com.beast.app.ui.workoutcompletion.WorkoutCompletionRoute
+import com.beast.app.ui.workoutcompletion.WorkoutCompletionViewModel
 import com.beast.app.ui.workoutdetail.WorkoutDetailRoute
+import com.beast.app.ui.workouthistory.WorkoutHistoryRoute
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -175,20 +181,51 @@ private fun AppNav(onboardingShown: Boolean, programSetupDone: Boolean, onOnboar
             } else {
                 ActiveWorkoutRoute(
                     onBack = { navController.popBackStack() },
-                    onWorkoutCompleted = { _ ->
-                        navController.popBackStack("home", false)
+                    onWorkoutCompleted = { result ->
+                        navController.navigate("workout_complete") { launchSingleTop = true }
+                        navController.currentBackStackEntry?.savedStateHandle?.set(
+                            WorkoutCompletionViewModel.KEY_RESULT,
+                            result
+                        )
+                        navController.previousBackStackEntry?.savedStateHandle?.remove<ActiveWorkoutResult>(
+                            WorkoutCompletionViewModel.KEY_RESULT
+                        )
                     }
                 )
             }
+        }
+        composable("workout_complete") {
+            WorkoutCompletionRoute(
+                onBackToHome = {
+                    navController.popBackStack("home", false)
+                },
+                onDiscard = {
+                    navController.popBackStack("home", false)
+                }
+            )
         }
         composable("profile") {
             ProfileScreen(onBack = { navController.popBackStack() })
         }
         composable("calendar") {
-            CalendarScreen(onBack = { navController.popBackStack() })
+            CalendarRoute(
+                onBack = { navController.popBackStack() },
+                onStartWorkout = { workoutId ->
+                    navController.navigate("active_workout/$workoutId") { launchSingleTop = true }
+                },
+                onViewWorkoutDetails = { workoutId ->
+                    navController.navigate("workout/$workoutId") { launchSingleTop = true }
+                }
+            )
         }
         composable("progress") {
-            ProgressScreen(onBack = { navController.popBackStack() })
+            ProgressRoute(
+                onBack = { navController.popBackStack() },
+                onOpenHistory = { navController.navigate("workout_history") },
+                onOpenWorkout = { workoutId ->
+                    navController.navigate("workout/$workoutId") { launchSingleTop = true }
+                }
+            )
         }
         composable("programs") {
             ProgramRoute(
@@ -198,6 +235,17 @@ private fun AppNav(onboardingShown: Boolean, programSetupDone: Boolean, onOnboar
                 },
                 onViewWorkoutDetails = { workoutId ->
                     navController.navigate("workout/$workoutId") { launchSingleTop = true }
+                }
+            )
+        }
+        composable("workout_history") {
+            WorkoutHistoryRoute(
+                onBack = { navController.popBackStack() },
+                onSelectWorkout = { workoutId ->
+                    navController.navigate("workout/$workoutId") { launchSingleTop = true }
+                },
+                onStartFirstWorkout = {
+                    navController.popBackStack("home", false)
                 }
             )
         }
@@ -236,88 +284,6 @@ private fun ProfileScreen(onBack: () -> Unit) {
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center
             )
-        }
-    }
-}
-
-@Composable
-private fun CalendarScreen(onBack: () -> Unit) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Календарь", style = MaterialTheme.typography.titleLarge) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            ElevatedCard(modifier = Modifier) {
-                Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "Календарь тренировок в разработке",
-                        style = MaterialTheme.typography.titleMedium,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "Здесь появится месячный календарь с прогрессом",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 8.dp),
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProgressScreen(onBack: () -> Unit) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Прогресс", style = MaterialTheme.typography.titleLarge) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            ElevatedCard(modifier = Modifier) {
-                Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "Аналитика прогресса ещё не готова",
-                        style = MaterialTheme.typography.titleMedium,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "В будущих версиях здесь появятся графики и статистика",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 8.dp),
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
         }
     }
 }

@@ -586,6 +586,7 @@ class ActiveWorkoutViewModel(
         var completedSets = 0
         var totalVolume = 0.0
         var totalReps = 0
+        val setResults = mutableListOf<CompletedSetResult>()
 
         val exerciseSummaries = state.exercises.map { exercise ->
             var exerciseCompletedSets = 0
@@ -594,22 +595,35 @@ class ActiveWorkoutViewModel(
 
             exercise.sets.forEach { set ->
                 totalSets += 1
+                val weightValue = set.weightInput.toDoubleOrNull()
+                    ?: set.previousWeight
+                val repsValue = set.repsInput.toIntOrNull()
+                    ?: set.goalReps?.toIntOrNull()
+                    ?: set.previousReps
+                val volume = if (weightValue != null && repsValue != null) weightValue * repsValue else null
                 if (set.completed) {
                     completedSets += 1
-                    val weightValue = set.weightInput.toDoubleOrNull()
-                        ?: set.previousWeight
-                        ?: 0.0
-                    val repsValue = set.repsInput.toIntOrNull()
-                        ?: set.previousReps
-                        ?: set.goalReps?.toIntOrNull()
-                        ?: 0
-                    val volume = weightValue * repsValue
-                    totalVolume += volume
-                    totalReps += repsValue
-                    exerciseVolume += volume
-                    exerciseReps += repsValue
+                    if (volume != null) {
+                        totalVolume += volume
+                        exerciseVolume += volume
+                    }
+                    if (repsValue != null) {
+                        totalReps += repsValue
+                        exerciseReps += repsValue
+                    }
                     exerciseCompletedSets += 1
                 }
+                setResults += CompletedSetResult(
+                    exerciseId = exercise.id,
+                    exerciseName = exercise.name,
+                    setNumber = set.setNumber,
+                    weight = weightValue,
+                    reps = repsValue,
+                    goalReps = set.goalReps,
+                    completed = set.completed,
+                    volume = volume,
+                    isRecord = set.isNewRecord
+                )
             }
 
             CompletedExerciseResult(
@@ -633,7 +647,8 @@ class ActiveWorkoutViewModel(
             completedSets = completedSets,
             totalVolume = totalVolume,
             totalReps = totalReps,
-            exerciseSummaries = exerciseSummaries
+            exerciseSummaries = exerciseSummaries,
+            setResults = setResults
         )
     }
 
@@ -742,7 +757,8 @@ data class ActiveWorkoutResult(
     val completedSets: Int,
     val totalVolume: Double,
     val totalReps: Int,
-    val exerciseSummaries: List<CompletedExerciseResult>
+    val exerciseSummaries: List<CompletedExerciseResult>,
+    val setResults: List<CompletedSetResult>
 ) : Serializable
 
 data class CompletedExerciseResult(
@@ -752,4 +768,16 @@ data class CompletedExerciseResult(
     val completedSets: Int,
     val totalVolume: Double,
     val totalReps: Int
+) : Serializable
+
+data class CompletedSetResult(
+    val exerciseId: String,
+    val exerciseName: String,
+    val setNumber: Int,
+    val weight: Double?,
+    val reps: Int?,
+    val goalReps: String?,
+    val completed: Boolean,
+    val volume: Double?,
+    val isRecord: Boolean
 ) : Serializable

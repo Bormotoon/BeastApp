@@ -69,6 +69,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.animation:animation")
+    implementation("com.kizitonwose.calendar:compose:2.5.4")
 
     // Material 3 и адаптивные компоненты
     implementation("androidx.compose.material3:material3")
