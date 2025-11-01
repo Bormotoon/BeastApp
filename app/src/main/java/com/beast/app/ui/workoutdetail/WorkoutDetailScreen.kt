@@ -47,8 +47,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.github.mikephil.charting.charts.LineChart
+import com.github.mikephil.charting.components.XAxis
+import com.github.mikephil.charting.data.Entry
+import com.github.mikephil.charting.data.LineData
+import com.github.mikephil.charting.data.LineDataSet
+import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
+import java.util.Locale
+import kotlin.math.roundToInt
 
 @Composable
 fun WorkoutDetailRoute(
@@ -147,7 +157,7 @@ private fun WorkoutDetailContent(
     onViewLog: (String) -> Unit
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    val tabs = listOf("Упражнения", "История")
+    val tabs = listOf("Упражнения", "История", "Графики")
 
     Column(modifier = modifier) {
         LazyColumn(
@@ -185,7 +195,7 @@ private fun WorkoutDetailContent(
                         }
                     }
                 }
-                else -> {
+                1 -> {
                     if (state.history.isEmpty()) {
                         item {
                             HistoryEmptyState()
@@ -198,6 +208,11 @@ private fun WorkoutDetailContent(
                                 onRepeat = onStartWorkout
                             )
                         }
+                    }
+                }
+                else -> {
+                    item {
+                        WorkoutChartsTab(points = state.chartPoints, weightUnit = state.weightUnit)
                     }
                 }
             }
@@ -540,5 +555,131 @@ private fun FlowRowSpacered(content: List<String>) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun WorkoutChartsTab(points: List<WorkoutTrendPoint>, weightUnit: String) {
+    val volumeUnit = if (weightUnit.equals("lbs", ignoreCase = true)) "фунтов" else "кг"
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        WorkoutMetricChart(
+            title = "Общий объём",
+            subtitle = "за тренировку, $volumeUnit",
+            points = points,
+            valueSelector = { it.volume },
+            valueFormatterFn = { value -> formatFloat(value) }
+        )
+        WorkoutMetricChart(
+            title = "Средняя интенсивность",
+            subtitle = "${volumeUnit}/мин",
+            points = points,
+            valueSelector = { it.intensity },
+            valueFormatterFn = { value -> formatFloat(value, 2) }
+        )
+        WorkoutMetricChart(
+            title = "Время выполнения",
+            subtitle = "минут",
+            points = points,
+            valueSelector = { it.durationMinutes },
+            valueFormatterFn = { value -> formatFloat(value) }
+        )
+    }
+}
+
+@Composable
+private fun WorkoutMetricChart(
+    title: String,
+    subtitle: String,
+    points: List<WorkoutTrendPoint>,
+    valueSelector: (WorkoutTrendPoint) -> Float?,
+    valueFormatterFn: (Float) -> String
+) {
+    val entries = points.mapIndexedNotNull { index, point ->
+        val value = valueSelector(point) ?: return@mapIndexedNotNull null
+        Entry(index.toFloat(), value)
+    }
+    val labels = points.map { it.label }
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val primaryArgb = primaryColor.toArgb()
+    val primaryFillArgb = primaryColor.copy(alpha = 0.2f).toArgb()
+    val axisTextArgb = MaterialTheme.colorScheme.onSurface.toArgb()
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            if (entries.isEmpty()) {
+                Text(
+                    text = "Недостаточно данных для построения графика",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                AndroidView(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp),
+                    factory = { context ->
+                        LineChart(context).apply {
+                            setTouchEnabled(true)
+                            isDragEnabled = true
+                            setScaleEnabled(false)
+                            description.isEnabled = false
+                            legend.isEnabled = false
+                            axisRight.isEnabled = false
+                            xAxis.position = XAxis.XAxisPosition.BOTTOM
+                            xAxis.setDrawGridLines(false)
+                            axisLeft.setDrawGridLines(true)
+                        }
+                    },
+                    update = { chart ->
+                        val dataSet = LineDataSet(entries, title).apply {
+                            color = primaryArgb
+                            setCircleColor(primaryArgb)
+                            lineWidth = 2f
+                            circleRadius = 4f
+                            setDrawValues(false)
+                            mode = LineDataSet.Mode.CUBIC_BEZIER
+                            setDrawFilled(true)
+                            fillColor = primaryFillArgb
+                        }
+                        chart.data = LineData(dataSet)
+                        chart.xAxis.apply {
+                            granularity = 1f
+                            axisMinimum = 0f
+                            axisMaximum = (labels.size - 1).coerceAtLeast(0).toFloat()
+                            this.valueFormatter = IndexAxisValueFormatter(labels)
+                            labelRotationAngle = if (labels.size > 4) 45f else 0f
+                            textColor = axisTextArgb
+                        }
+                        chart.axisLeft.apply {
+                            textColor = axisTextArgb
+                            valueFormatter = object : com.github.mikephil.charting.formatter.ValueFormatter() {
+                                override fun getFormattedValue(value: Float): String = valueFormatterFn(value)
+                            }
+                        }
+                        chart.invalidate()
+                    }
+                )
+            }
+        }
+    }
+}
+
+private fun formatFloat(value: Float, decimals: Int = 1): String {
+    return if (value % 1f == 0f) {
+        value.roundToInt().toString()
+    } else {
+        String.format(Locale.getDefault(), "%.${decimals}f", value)
     }
 }

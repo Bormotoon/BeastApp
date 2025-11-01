@@ -101,6 +101,25 @@ class WorkoutDetailViewModel(
             )
         }
 
+        val chartPoints = logs
+            .sortedBy { it.dateEpochMillis }
+            .map { log ->
+                val label = Instant.ofEpochMilli(log.dateEpochMillis)
+                    .atZone(zone)
+                    .format(DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()))
+                val intensity = if (log.totalDuration > 0 && log.totalVolume > 0.0) {
+                    (log.totalVolume / log.totalDuration).toFloat()
+                } else {
+                    null
+                }
+                WorkoutTrendPoint(
+                    label = label,
+                    volume = log.totalVolume.takeIf { it > 0.0 }?.toFloat(),
+                    durationMinutes = log.totalDuration.takeIf { it > 0 }?.toFloat(),
+                    intensity = intensity
+                )
+            }
+
         val exercises = workoutWithExercises.mappings.sortedBy { it.orderIndex }.mapNotNull { mapping ->
             val exercise = workoutWithExercises.exercises.firstOrNull { it.id == mapping.exerciseId }
                 ?: return@mapNotNull null
@@ -131,7 +150,8 @@ class WorkoutDetailViewModel(
             exercises = exercises,
             lastCompletedLabel = lastCompletedLabel,
             weightUnit = weightUnit,
-            history = historyItems
+            history = historyItems,
+            chartPoints = chartPoints
         )
     }
 
@@ -201,7 +221,8 @@ data class WorkoutDetailUiState(
     val exercises: List<WorkoutExerciseUiModel> = emptyList(),
     val errorMessage: String? = null,
     val weightUnit: String = "kg",
-    val history: List<WorkoutHistoryItemUiModel> = emptyList()
+    val history: List<WorkoutHistoryItemUiModel> = emptyList(),
+    val chartPoints: List<WorkoutTrendPoint> = emptyList()
 )
 
 data class WorkoutExerciseUiModel(
@@ -230,4 +251,11 @@ data class WorkoutHistoryItemUiModel(
     val notesPreview: String?,
     val isBestVolume: Boolean,
     val canRepeat: Boolean
+)
+
+data class WorkoutTrendPoint(
+    val label: String,
+    val volume: Float?,
+    val durationMinutes: Float?,
+    val intensity: Float?
 )
