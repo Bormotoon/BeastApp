@@ -69,6 +69,7 @@ class WorkoutDetailViewModel(
 
         val phaseName = summary?.phaseByWorkout?.get(workoutId)
         val programName = summary?.program?.name
+        val isFavorite = workoutRepository.isWorkoutFavorite(workoutId)
 
         val logs = workoutRepository.getLogsForWorkout(workoutId)
         val latestLog = logs.firstOrNull()
@@ -151,8 +152,19 @@ class WorkoutDetailViewModel(
             lastCompletedLabel = lastCompletedLabel,
             weightUnit = weightUnit,
             history = historyItems,
-            chartPoints = chartPoints
+            chartPoints = chartPoints,
+            isFavorite = isFavorite
         )
+    }
+
+    fun toggleFavorite() {
+        val current = _uiState.value
+        val currentWorkoutId = current.workoutId ?: return
+        val targetValue = !current.isFavorite
+        _uiState.value = current.copy(isFavorite = targetValue)
+        viewModelScope.launch {
+            workoutRepository.setWorkoutFavorite(currentWorkoutId, targetValue)
+        }
     }
 
     private fun formatDurationLabel(totalMinutes: Int): String? {
@@ -222,7 +234,8 @@ data class WorkoutDetailUiState(
     val errorMessage: String? = null,
     val weightUnit: String = "kg",
     val history: List<WorkoutHistoryItemUiModel> = emptyList(),
-    val chartPoints: List<WorkoutTrendPoint> = emptyList()
+    val chartPoints: List<WorkoutTrendPoint> = emptyList(),
+    val isFavorite: Boolean = false
 )
 
 data class WorkoutExerciseUiModel(

@@ -22,7 +22,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.MilitaryTech
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -73,7 +76,8 @@ fun WorkoutDetailRoute(
         onBack = onBack,
         onStartWorkout = onStartWorkout,
         onViewLog = onViewWorkoutLog,
-        onRetry = viewModel::refresh
+        onRetry = viewModel::refresh,
+        onToggleFavorite = viewModel::toggleFavorite
     )
 }
 
@@ -83,7 +87,8 @@ private fun WorkoutDetailScreen(
     onBack: () -> Unit,
     onStartWorkout: (String) -> Unit,
     onViewLog: (String) -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onToggleFavorite: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -141,7 +146,8 @@ private fun WorkoutDetailScreen(
                             .padding(innerPadding),
                         state = state,
                         onStartWorkout = { onStartWorkout(workoutId) },
-                        onViewLog = onViewLog
+                        onViewLog = onViewLog,
+                        onToggleFavorite = onToggleFavorite
                     )
                 }
             }
@@ -154,7 +160,8 @@ private fun WorkoutDetailContent(
     modifier: Modifier,
     state: WorkoutDetailUiState,
     onStartWorkout: () -> Unit,
-    onViewLog: (String) -> Unit
+    onViewLog: (String) -> Unit,
+    onToggleFavorite: () -> Unit
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val tabs = listOf("Упражнения", "История", "Графики")
@@ -166,7 +173,11 @@ private fun WorkoutDetailContent(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                OverviewCard(state = state, onStartWorkout = onStartWorkout)
+                OverviewCard(
+                    state = state,
+                    onStartWorkout = onStartWorkout,
+                    onToggleFavorite = onToggleFavorite
+                )
             }
             item {
                 ScrollableTabRow(selectedTabIndex = selectedTab) {
@@ -221,7 +232,11 @@ private fun WorkoutDetailContent(
 }
 
 @Composable
-private fun OverviewCard(state: WorkoutDetailUiState, onStartWorkout: () -> Unit) {
+private fun OverviewCard(
+    state: WorkoutDetailUiState,
+    onStartWorkout: () -> Unit,
+    onToggleFavorite: () -> Unit
+) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -263,8 +278,34 @@ private fun OverviewCard(state: WorkoutDetailUiState, onStartWorkout: () -> Unit
                 )
             }
 
-            Button(onClick = onStartWorkout, modifier = Modifier.fillMaxWidth()) {
-                Text("Начать тренировку")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                val favoriteLabel = if (state.isFavorite) "В избранном" else "Добавить в избранное"
+                val favoriteIcon = if (state.isFavorite) Icons.Outlined.Star else Icons.Outlined.StarBorder
+                val favoriteColors = if (state.isFavorite) {
+                    ButtonDefaults.outlinedButtonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                } else {
+                    ButtonDefaults.outlinedButtonColors()
+                }
+
+                OutlinedButton(
+                    onClick = onToggleFavorite,
+                    modifier = Modifier.weight(1f),
+                    colors = favoriteColors
+                ) {
+                    Icon(imageVector = favoriteIcon, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(favoriteLabel)
+                }
+
+                Button(onClick = onStartWorkout, modifier = Modifier.weight(1f)) {
+                    Text("Начать тренировку")
+                }
             }
         }
     }

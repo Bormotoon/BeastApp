@@ -54,6 +54,18 @@ interface WorkoutDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertExerciseInWorkout(list: List<ExerciseInWorkoutEntity>)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun addFavorite(workoutFavoriteEntity: WorkoutFavoriteEntity)
+
+    @Query("DELETE FROM favorite_workouts WHERE workoutId = :workoutId")
+    suspend fun removeFavorite(workoutId: String)
+
+    @Query("SELECT EXISTS(SELECT 1 FROM favorite_workouts WHERE workoutId = :workoutId)")
+    suspend fun isFavorite(workoutId: String): Boolean
+
+    @Query("SELECT workoutId FROM favorite_workouts")
+    suspend fun getFavoriteWorkoutIds(): List<String>
+
     @Transaction
     @Query("SELECT * FROM workouts WHERE id = :id LIMIT 1")
     suspend fun getWorkout(id: String): WorkoutEntity?

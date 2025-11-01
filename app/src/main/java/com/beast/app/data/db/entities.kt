@@ -132,3 +132,9 @@ data class PersonalRecordEntity(
     val dateEpochDay: Long
 )
 
+@Entity(tableName = "favorite_workouts")
+data class WorkoutFavoriteEntity(
+    @PrimaryKey val workoutId: String,
+    val addedAtEpochMillis: Long
+)
+

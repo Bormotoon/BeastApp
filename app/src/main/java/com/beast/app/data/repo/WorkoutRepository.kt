@@ -80,5 +80,26 @@ class WorkoutRepository private constructor(
         if (workoutIds.isEmpty()) return@withContext emptyMap()
         workoutLogDao.getLatestLogsForWorkouts(workoutIds).associateBy { it.workoutId }
     }
+
+    suspend fun isWorkoutFavorite(workoutId: String): Boolean = withContext(Dispatchers.IO) {
+        workoutDao.isFavorite(workoutId)
+    }
+
+    suspend fun setWorkoutFavorite(workoutId: String, favorite: Boolean) = withContext(Dispatchers.IO) {
+        if (favorite) {
+            workoutDao.addFavorite(
+                WorkoutFavoriteEntity(
+                    workoutId = workoutId,
+                    addedAtEpochMillis = System.currentTimeMillis()
+                )
+            )
+        } else {
+            workoutDao.removeFavorite(workoutId)
+        }
+    }
+
+    suspend fun getFavoriteWorkoutIds(): List<String> = withContext(Dispatchers.IO) {
+        workoutDao.getFavoriteWorkoutIds()
+    }
 }
 
