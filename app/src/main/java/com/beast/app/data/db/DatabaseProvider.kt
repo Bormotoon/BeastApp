@@ -28,6 +28,39 @@ object DatabaseProvider {
         }
     }
 
+    private val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE user_profile ADD COLUMN avatarUri TEXT")
+            db.execSQL("ALTER TABLE user_profile ADD COLUMN heightCm REAL")
+            db.execSQL("ALTER TABLE user_profile ADD COLUMN age INTEGER")
+            db.execSQL("ALTER TABLE user_profile ADD COLUMN gender TEXT")
+        }
+    }
+
+    private val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE body_measurements ADD COLUMN calfLeft REAL")
+            db.execSQL("ALTER TABLE body_measurements ADD COLUMN calfRight REAL")
+        }
+    }
+
+    private val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS progress_photos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    dateEpochDay INTEGER NOT NULL,
+                    angle TEXT NOT NULL,
+                    uri TEXT NOT NULL,
+                    createdAtEpochMillis INTEGER NOT NULL,
+                    notes TEXT
+                )
+                """.trimIndent()
+            )
+        }
+    }
+
     fun get(context: Context): BeastDatabase {
         return INSTANCE ?: synchronized(this) {
             val instance = Room.databaseBuilder(
@@ -35,7 +68,7 @@ object DatabaseProvider {
                 BeastDatabase::class.java,
                 "beast.db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
             INSTANCE = instance
             instance

@@ -102,6 +102,12 @@ dependencies {
     // Charts
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
+    // Images
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Biometrics
+    implementation("androidx.biometric:biometric:1.1.0")
+
     // Тесты
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
@@ -118,4 +124,7 @@ dependencies {
 
     // JSON: Gson
     implementation("com.google.code.gson:gson:2.11.0")
+
+    // Preferences
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 }

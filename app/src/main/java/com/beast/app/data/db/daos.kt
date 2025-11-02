@@ -149,17 +149,47 @@ interface ProfileDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBodyWeight(entry: BodyWeightEntryEntity)
 
+    @Query("DELETE FROM body_weight WHERE dateEpochDay = :epochDay")
+    suspend fun deleteBodyWeightByDate(epochDay: Long)
+
+    @Transaction
+    suspend fun replaceBodyWeight(entry: BodyWeightEntryEntity) {
+        deleteBodyWeightByDate(entry.dateEpochDay)
+        insertBodyWeight(entry)
+    }
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMeasurement(entry: BodyMeasurementEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPersonalRecord(entry: PersonalRecordEntity)
 
+    @Query("DELETE FROM body_measurements WHERE dateEpochDay = :epochDay")
+    suspend fun deleteMeasurementByDate(epochDay: Long)
+
+    @Transaction
+    suspend fun replaceMeasurement(entry: BodyMeasurementEntity) {
+        deleteMeasurementByDate(entry.dateEpochDay)
+        insertMeasurement(entry)
+    }
+
     @Query("SELECT * FROM user_profile WHERE id = 1")
     suspend fun getProfile(): UserProfileEntity?
 
+        @Insert(onConflict = OnConflictStrategy.REPLACE)
+        suspend fun insertProgressPhoto(photo: ProgressPhotoEntity)
+
+        @Query("DELETE FROM progress_photos WHERE id = :photoId")
+        suspend fun deleteProgressPhoto(photoId: Long)
+
+        @Query("SELECT * FROM progress_photos ORDER BY dateEpochDay DESC, createdAtEpochMillis DESC")
+        suspend fun getProgressPhotos(): List<ProgressPhotoEntity>
+
     @Query("SELECT DISTINCT dateEpochDay FROM personal_records WHERE dateEpochDay IN (:epochDays)")
     suspend fun getPersonalRecordDates(epochDays: List<Long>): List<Long>
+
+    @Query("SELECT * FROM body_measurements ORDER BY dateEpochDay ASC")
+    suspend fun getBodyMeasurements(): List<BodyMeasurementEntity>
 
     @Query(
         """
@@ -181,6 +211,9 @@ interface ProfileDao {
         """
     )
     suspend fun getTopPersonalRecords(limit: Int): List<PersonalRecordWithExercise>
+
+    @Query("SELECT * FROM body_weight ORDER BY dateEpochDay ASC")
+    suspend fun getBodyWeightEntries(): List<BodyWeightEntryEntity>
 }
 
 data class WorkoutLogSetAggregate(

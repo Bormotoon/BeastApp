@@ -19,9 +19,10 @@ import androidx.room.TypeConverters
         BodyWeightEntryEntity::class,
         BodyMeasurementEntity::class,
         PersonalRecordEntity::class,
-        WorkoutFavoriteEntity::class
+        WorkoutFavoriteEntity::class,
+        ProgressPhotoEntity::class
     ],
-    version = 3,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
