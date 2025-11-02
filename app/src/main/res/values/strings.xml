@@ -3,18 +3,18 @@
     <string name="app_name">BeastApp</string>
 
     <!-- Onboarding / Program selection -->
-    <string name="select_program_title">Выберите вашу программу</string>
-    <string name="select_program_subtitle">Huge Beast — фокус на массу\nLean Beast — масса + кардио</string>
+    <string name="select_program_title">Choose your program</string>
+    <string name="select_program_subtitle">Huge Beast - mass focus\nLean Beast - mass plus cardio</string>
 
     <string name="huge_beast">Huge Beast</string>
     <string name="lean_beast">Lean Beast</string>
-    <string name="huge_subtitle">Фокус на массу</string>
-    <string name="lean_subtitle">Масса + кардио</string>
+    <string name="huge_subtitle">Mass focus</string>
+    <string name="lean_subtitle">Mass plus cardio</string>
 
-    <string name="start_date">Дата начала: %1$s</string>
+    <string name="start_date">Start date: %1$s</string>
 
-    <string name="kg">Кг</string>
-    <string name="lbs">Фунты</string>
+    <string name="kg">kg</string>
+    <string name="lbs">lbs</string>
 
-    <string name="start_program_button">Начать программу</string>
+    <string name="start_program_button">Start program</string>
 </resources>

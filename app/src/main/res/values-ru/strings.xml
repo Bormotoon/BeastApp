@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BeastApp</string>
+
+    <!-- Onboarding / Program selection -->
+    <string name="select_program_title">Выберите вашу программу</string>
+    <string name="select_program_subtitle">Huge Beast - фокус на массу\nLean Beast - масса + кардио</string>
+
+    <string name="huge_beast">Huge Beast</string>
+    <string name="lean_beast">Lean Beast</string>
+    <string name="huge_subtitle">Фокус на массу</string>
+    <string name="lean_subtitle">Масса + кардио</string>
+
+    <string name="start_date">Дата начала: %1$s</string>
+
+    <string name="kg">Кг</string>
+    <string name="lbs">Фунты</string>
+
+    <string name="start_program_button">Начать программу</string>
+</resources>
