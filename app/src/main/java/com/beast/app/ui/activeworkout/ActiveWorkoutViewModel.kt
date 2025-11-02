@@ -293,6 +293,7 @@ class ActiveWorkoutViewModel(
                 val shouldShowDialog = trigger.showDialog
                 startRestTimer(totalSeconds = trigger.seconds, showDialog = shouldShowDialog)
             }
+            maybeAutoAdvanceSpecialSet(_uiState.value, exerciseId)
         }
     }
 
@@ -339,6 +340,27 @@ class ActiveWorkoutViewModel(
                 RestTrigger(seconds = seconds, showDialog = true)
             }
         }
+    }
+
+    private fun maybeAutoAdvanceSpecialSet(state: ActiveWorkoutUiState, exerciseId: String) {
+        val exerciseIndex = state.exercises.indexOfFirst { it.id == exerciseId }
+        if (exerciseIndex == -1) return
+        val exercise = state.exercises[exerciseIndex]
+        if (exercise.setType != SetType.SUPER && exercise.setType != SetType.GIANT) return
+        val groupId = exercise.groupId ?: return
+        val groupIndices = state.exercises.mapIndexedNotNull { index, item ->
+            if (item.groupId == groupId) index else null
+        }
+        if (groupIndices.isEmpty()) return
+        val groupCompleted = groupIndices.all { index ->
+            state.exercises.getOrNull(index)?.sets?.all { it.completed } == true
+        }
+        if (!groupCompleted) return
+        val leaderIndex = groupIndices.minOrNull() ?: return
+        if (state.currentExerciseIndex != leaderIndex) return
+        val position = state.visibleExerciseIndices.indexOf(leaderIndex)
+        if (position == -1 || position >= state.visibleExerciseIndices.lastIndex) return
+        nextExercise()
     }
 
     private fun MutableStateFlow<ActiveWorkoutUiState>.updateSet(
