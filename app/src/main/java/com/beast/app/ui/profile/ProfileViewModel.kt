@@ -9,12 +9,12 @@ import com.beast.app.data.db.DatabaseProvider
 import com.beast.app.data.db.UserProfileEntity
 import com.beast.app.data.repo.ProfileRepository
 import com.beast.app.data.repo.ProgramRepository
+import com.beast.app.utils.DateFormatting
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
@@ -30,7 +30,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private var cachedWeights: List<BodyWeightEntryEntity> = emptyList()
     private var cachedMeasurements: List<BodyMeasurementEntity> = emptyList()
 
-    private val dateFormatter = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.getDefault())
+    private val dateFormatter = DateFormatting.dateFormatter(Locale.getDefault(), "yMMMMd")
 
     init {
         refresh()

@@ -76,7 +76,7 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import com.beast.app.utils.DateFormatting
 import java.util.Locale
 
 @Composable
@@ -315,7 +315,7 @@ private fun AddPhotoCard(
 ) {
     val context = LocalContext.current
     val locale = remember { Locale.getDefault() }
-    val formatter = remember { DateTimeFormatter.ofPattern("d MMM yyyy", locale) }
+    val formatter = remember(locale) { DateFormatting.dateFormatter(locale, "yMMMd") }
     val formattedDate = remember(selectedDate) { formatter.format(selectedDate) }
 
     Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 4.dp) {

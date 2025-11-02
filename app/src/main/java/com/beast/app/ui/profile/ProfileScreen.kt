@@ -81,7 +81,7 @@ import com.github.mikephil.charting.formatter.ValueFormatter
 import java.io.InputStream
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import com.beast.app.utils.DateFormatting
 import java.util.Calendar
 import java.util.Locale
 import kotlin.io.buffered
@@ -541,7 +541,7 @@ private fun MeasurementsCard(
 ) {
     val context = LocalContext.current
     val locale = remember { Locale.getDefault() }
-    val dateFormatter = remember { DateTimeFormatter.ofPattern("d MMM yyyy", locale) }
+    val dateFormatter = remember(locale) { DateFormatting.dateFormatter(locale, "yMMMd") }
     val formattedDate = remember(measurementDate) { dateFormatter.format(measurementDate) }
     val chipScroll = rememberScrollState()
 
@@ -711,7 +711,7 @@ private fun MeasurementTrendChart(history: List<MeasurementPoint>, metric: Measu
         return
     }
     val locale = Locale.getDefault()
-    val formatter = DateTimeFormatter.ofPattern("d MMM", locale)
+    val formatter = DateFormatting.dateFormatter(locale, "MMMd")
     val labels = history.map { formatter.format(it.date) }
     val lineColor = MaterialTheme.colorScheme.secondary
     val axisColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -765,7 +765,7 @@ private fun MeasurementTrendChart(history: List<MeasurementPoint>, metric: Measu
 @Composable
 private fun WeightTrendChart(history: List<WeightPoint>, weightUnit: String) {
     val locale = Locale.getDefault()
-    val formatter = DateTimeFormatter.ofPattern("d MMM", locale)
+    val formatter = DateFormatting.dateFormatter(locale, "MMMd")
     val labels = history.map { formatter.format(it.date) }
     val entries = history.mapIndexed { index, point ->
         Entry(index.toFloat(), point.weight.toFloat())

@@ -8,12 +8,12 @@ import com.beast.app.data.db.DatabaseProvider
 import com.beast.app.data.repo.ProgramRepository
 import com.beast.app.data.repo.ProfileRepository
 import com.beast.app.data.repo.WorkoutRepository
+import com.beast.app.utils.DateFormatting
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 class WorkoutHistoryViewModel(
@@ -65,8 +65,8 @@ class WorkoutHistoryViewModel(
 
             val zone = ZoneId.systemDefault()
             val locale = Locale.getDefault()
-            val dateFormatter = DateTimeFormatter.ofPattern("d MMMM yyyy", locale)
-            val dayFormatter = DateTimeFormatter.ofPattern("EEE", locale)
+            val dateFormatter = DateFormatting.dateFormatter(locale, "yMMMMd")
+            val dayFormatter = DateFormatting.dateFormatter(locale, "EEE")
 
             val workoutIds = logs.map { it.workoutId }.distinct()
             val workouts = workoutRepository.getWorkoutsByIds(workoutIds).associateBy { it.id }
@@ -85,12 +85,8 @@ class WorkoutHistoryViewModel(
                 WorkoutHistoryItem(
                     logId = log.id,
                     workoutId = log.workoutId,
-                    dateLabel = logDate.format(dateFormatter).replaceFirstChar { char ->
-                        if (char.isLowerCase()) char.titlecase(locale) else char.toString()
-                    },
-                    dayOfWeekLabel = logDate.format(dayFormatter).replaceFirstChar { char ->
-                        if (char.isLowerCase()) char.titlecase(locale) else char.toString()
-                    },
+                    dateLabel = DateFormatting.capitalize(logDate.format(dateFormatter), locale),
+                    dayOfWeekLabel = DateFormatting.capitalize(logDate.format(dayFormatter), locale),
                     workoutName = workout?.name ?: "Неизвестная тренировка",
                     phaseName = summary?.phaseByWorkout?.get(log.workoutId),
                     status = log.status.toHistoryStatus(),

@@ -13,6 +13,7 @@ import com.beast.app.data.db.WorkoutLogExerciseAggregate
 import com.beast.app.data.repo.ProgramRepository
 import com.beast.app.data.repo.ProfileRepository
 import com.beast.app.data.repo.WorkoutRepository
+import com.beast.app.utils.DateFormatting
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -149,8 +150,8 @@ class ProgressViewModel(application: Application) : AndroidViewModel(application
     ): ProgressStats {
         val zone = ZoneId.systemDefault()
         val locale = Locale.getDefault()
-        val dateFormatter = DateTimeFormatter.ofPattern("d MMMM yyyy", locale)
-        val dayFormatter = DateTimeFormatter.ofPattern("EEE", locale)
+        val dateFormatter = DateFormatting.dateFormatter(locale, "yMMMMd")
+        val dayFormatter = DateFormatting.dateFormatter(locale, "EEE")
 
         val filteredLogs = filterLogsForPeriod(period, data, currentPhaseName, zone)
         val sortedLogs = filteredLogs.sortedByDescending { it.dateEpochMillis }

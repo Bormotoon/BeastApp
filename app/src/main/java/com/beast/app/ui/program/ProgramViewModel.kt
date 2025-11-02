@@ -8,13 +8,13 @@ import com.beast.app.data.db.DatabaseProvider
 import com.beast.app.data.repo.ProfileRepository
 import com.beast.app.data.repo.ProgramRepository
 import com.beast.app.data.repo.WorkoutRepository
+import com.beast.app.utils.DateFormatting
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 class ProgramViewModel(application: Application) : AndroidViewModel(application) {
@@ -62,7 +62,8 @@ class ProgramViewModel(application: Application) : AndroidViewModel(application)
         val latestLogs = workoutRepository.getLatestLogsForWorkouts(allWorkoutIds)
 
         val zone = ZoneId.systemDefault()
-        val formatter = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.getDefault())
+        val locale = Locale.getDefault()
+        val formatter = DateFormatting.dateFormatter(locale, "yMMMMd")
 
         val phaseUi = overview.phases.map { phase ->
             val workouts = phase.workouts.map { workout ->

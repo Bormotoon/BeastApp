@@ -16,9 +16,9 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+import com.beast.app.utils.DateFormatting
 
 class PhotoProgressViewModel(application: Application) : AndroidViewModel(application) {
     private val database = DatabaseProvider.get(application.applicationContext)
@@ -247,6 +247,6 @@ enum class PhotoAngle(val storage: String, val displayName: String) {
     }
 }
 
-private val dateDisplayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.getDefault())
-
-fun LocalDate.displayLabel(): String = format(dateDisplayFormatter)
+fun LocalDate.displayLabel(locale: Locale = Locale.getDefault()): String {
+    return DateFormatting.format(this, locale, "yMMMMd", capitalizeFirst = true)
+}

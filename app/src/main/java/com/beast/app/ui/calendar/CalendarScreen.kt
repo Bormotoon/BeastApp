@@ -56,9 +56,9 @@ import com.kizitonwose.calendar.core.firstDayOfWeekFromLocale
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import com.beast.app.utils.DateFormatting
 
 @Composable
 fun CalendarRoute(
@@ -201,16 +201,12 @@ private fun CalendarContent(
 @Composable
 private fun MonthHeader(monthName: java.time.YearMonth, daysOfWeek: List<DayOfWeek>) {
     val locale = Locale.getDefault()
-    val formatter = remember(locale) {
-        DateTimeFormatter.ofPattern("LLLL yyyy", locale)
-    }
+    val formatter = remember(locale) { DateFormatting.dateFormatter(locale, "LLLLyyyy") }
     Column(modifier = Modifier
         .fillMaxWidth()
         .padding(bottom = 8.dp)) {
         Text(
-            text = monthName.format(formatter).replaceFirstChar { char ->
-                if (char.isLowerCase()) char.titlecase(locale) else char.toString()
-            },
+            text = DateFormatting.capitalize(monthName.format(formatter), locale),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold
         )
@@ -304,18 +300,14 @@ private fun DayDetailsSheet(
     onViewWorkoutDetails: (String) -> Unit
 ) {
     val locale = Locale.getDefault()
-    val dateFormatter = remember(locale) {
-        DateTimeFormatter.ofPattern("d MMMM yyyy", locale)
-    }
+    val dateFormatter = remember(locale) { DateFormatting.dateFormatter(locale, "yMMMMd") }
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
         Text(
-            text = summary.date.format(dateFormatter).replaceFirstChar { char ->
-                if (char.isLowerCase()) char.titlecase(locale) else char.toString()
-            },
+            text = DateFormatting.capitalize(summary.date.format(dateFormatter), locale),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold
         )

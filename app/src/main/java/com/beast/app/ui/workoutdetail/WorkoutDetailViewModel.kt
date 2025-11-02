@@ -9,12 +9,12 @@ import com.beast.app.data.db.DatabaseProvider
 import com.beast.app.data.repo.ProgramRepository
 import com.beast.app.data.repo.ProfileRepository
 import com.beast.app.data.repo.WorkoutRepository
+import com.beast.app.utils.DateFormatting
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 class WorkoutDetailViewModel(
@@ -77,7 +77,8 @@ class WorkoutDetailViewModel(
         val bestVolume = logs.maxOfOrNull { it.totalVolume } ?: 0.0
 
         val zone = ZoneId.systemDefault()
-        val formatter = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.getDefault())
+        val locale = Locale.getDefault()
+        val formatter = DateFormatting.dateFormatter(locale, "yMMMMd")
 
         val lastCompletedDate = latestLog?.dateEpochMillis?.let { millis ->
             Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
@@ -89,7 +90,7 @@ class WorkoutDetailViewModel(
             val isBestVolume = log.totalVolume > 0 && log.totalVolume >= bestVolume
             WorkoutHistoryItemUiModel(
                 id = log.id,
-                dateLabel = logDate.format(DateTimeFormatter.ofPattern("d MMM yyyy, EEE", Locale.getDefault())),
+                dateLabel = DateFormatting.format(logDate, locale, "yMMMdEEE"),
                 statusLabel = formatStatus(log.status),
                 durationLabel = formatDurationLabel(log.totalDuration),
                 volumeLabel = formatVolumeLabel(log.totalVolume, weightUnit),
@@ -105,9 +106,11 @@ class WorkoutDetailViewModel(
         val chartPoints = logs
             .sortedBy { it.dateEpochMillis }
             .map { log ->
-                val label = Instant.ofEpochMilli(log.dateEpochMillis)
-                    .atZone(zone)
-                    .format(DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()))
+                val label = DateFormatting.format(
+                    temporal = Instant.ofEpochMilli(log.dateEpochMillis).atZone(zone),
+                    locale = locale,
+                    skeleton = "MMMd"
+                )
                 val intensity = if (log.totalDuration > 0 && log.totalVolume > 0.0) {
                     (log.totalVolume / log.totalDuration).toFloat()
                 } else {

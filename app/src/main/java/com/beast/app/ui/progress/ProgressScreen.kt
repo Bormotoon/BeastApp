@@ -73,8 +73,8 @@ import com.github.mikephil.charting.data.PieDataSet
 import com.github.mikephil.charting.data.PieEntry
 import com.github.mikephil.charting.formatter.PercentFormatter
 import com.github.mikephil.charting.formatter.ValueFormatter
+import com.beast.app.utils.DateFormatting
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -373,7 +373,7 @@ private fun VolumeTrendCard(series: List<VolumePoint>, weightUnit: String) {
                 )
             } else {
                 val locale = Locale.getDefault()
-                val formatter = remember(locale) { DateTimeFormatter.ofPattern("d MMM", locale) }
+                val formatter = remember(locale) { DateFormatting.dateFormatter(locale, "MMMd") }
                 val displaySeries = if (series.size > 12) series.takeLast(12) else series
                 val labels = displaySeries.map { formatter.format(it.weekStart) }
                 val unitSuffix = if (weightUnit.equals("lbs", ignoreCase = true)) "фунтов" else "кг"
@@ -699,7 +699,7 @@ private fun ActivityHeatmapCard(days: List<HeatmapDay>) {
     val weeks = days.chunked(7)
     if (weeks.isEmpty()) return
 
-    val monthFormatter = java.time.format.DateTimeFormatter.ofPattern("LLL", locale)
+    val monthFormatter = DateFormatting.dateFormatter(locale, "LLL")
     val dayLabels = listOf("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс")
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
