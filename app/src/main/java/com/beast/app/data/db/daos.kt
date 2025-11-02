@@ -33,14 +33,23 @@ interface ProgramDao {
     @Query("SELECT * FROM phases WHERE programName = :programName")
     suspend fun getPhases(programName: String): List<PhaseEntity>
 
+    @Query("SELECT * FROM phases ORDER BY programName, name")
+    suspend fun getAllPhases(): List<PhaseEntity>
+
     @Query("SELECT * FROM programs ORDER BY name")
     suspend fun getAllPrograms(): List<ProgramEntity>
 
     @Query("SELECT * FROM program_schedule WHERE programName = :programName ORDER BY dayNumber")
     suspend fun getSchedule(programName: String): List<ProgramScheduleEntity>
 
+    @Query("SELECT * FROM program_schedule ORDER BY programName, dayNumber")
+    suspend fun getAllSchedules(): List<ProgramScheduleEntity>
+
     @Query("SELECT * FROM phase_workout WHERE programName = :programName")
     suspend fun getPhaseWorkouts(programName: String): List<PhaseWorkoutCrossRefEntity>
+
+    @Query("SELECT * FROM phase_workout ORDER BY programName, phaseName, workoutId")
+    suspend fun getAllPhaseWorkouts(): List<PhaseWorkoutCrossRefEntity>
 }
 
 @Dao
@@ -73,14 +82,26 @@ interface WorkoutDao {
     @Query("SELECT * FROM workouts WHERE id IN (:ids)")
     suspend fun getWorkoutsByIds(ids: List<String>): List<WorkoutEntity>
 
+    @Query("SELECT * FROM workouts ORDER BY id")
+    suspend fun getAllWorkouts(): List<WorkoutEntity>
+
     @Query("SELECT * FROM exercise_in_workout WHERE workoutId = :workoutId ORDER BY orderIndex")
     suspend fun getExerciseMappings(workoutId: String): List<ExerciseInWorkoutEntity>
 
     @Query("SELECT * FROM exercise_in_workout WHERE workoutId IN (:workoutIds) ORDER BY workoutId, orderIndex")
     suspend fun getExerciseMappingsForWorkouts(workoutIds: List<String>): List<ExerciseInWorkoutEntity>
 
+    @Query("SELECT * FROM exercise_in_workout ORDER BY workoutId, orderIndex")
+    suspend fun getAllExerciseMappings(): List<ExerciseInWorkoutEntity>
+
     @Query("SELECT * FROM exercises WHERE id IN (:ids)")
     suspend fun getExercisesByIds(ids: List<String>): List<ExerciseEntity>
+
+    @Query("SELECT * FROM exercises ORDER BY id")
+    suspend fun getAllExercises(): List<ExerciseEntity>
+
+    @Query("SELECT * FROM favorite_workouts ORDER BY addedAtEpochMillis DESC")
+    suspend fun getAllFavorites(): List<WorkoutFavoriteEntity>
 }
 
 // Logs
@@ -100,6 +121,9 @@ interface WorkoutLogDao {
 
     @Query("SELECT * FROM set_logs WHERE workoutLogId = :workoutLogId ORDER BY setNumber")
     suspend fun getSetLogs(workoutLogId: String): List<SetLogEntity>
+
+    @Query("SELECT * FROM set_logs ORDER BY workoutLogId, setNumber")
+    suspend fun getAllSetLogs(): List<SetLogEntity>
 
     @Query(
         """
@@ -176,20 +200,23 @@ interface ProfileDao {
     @Query("SELECT * FROM user_profile WHERE id = 1")
     suspend fun getProfile(): UserProfileEntity?
 
-        @Insert(onConflict = OnConflictStrategy.REPLACE)
-        suspend fun insertProgressPhoto(photo: ProgressPhotoEntity)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProgressPhoto(photo: ProgressPhotoEntity)
 
-        @Query("DELETE FROM progress_photos WHERE id = :photoId")
-        suspend fun deleteProgressPhoto(photoId: Long)
+    @Query("DELETE FROM progress_photos WHERE id = :photoId")
+    suspend fun deleteProgressPhoto(photoId: Long)
 
-        @Query("SELECT * FROM progress_photos ORDER BY dateEpochDay DESC, createdAtEpochMillis DESC")
-        suspend fun getProgressPhotos(): List<ProgressPhotoEntity>
+    @Query("SELECT * FROM progress_photos ORDER BY dateEpochDay DESC, createdAtEpochMillis DESC")
+    suspend fun getProgressPhotos(): List<ProgressPhotoEntity>
 
     @Query("SELECT DISTINCT dateEpochDay FROM personal_records WHERE dateEpochDay IN (:epochDays)")
     suspend fun getPersonalRecordDates(epochDays: List<Long>): List<Long>
 
     @Query("SELECT * FROM body_measurements ORDER BY dateEpochDay ASC")
     suspend fun getBodyMeasurements(): List<BodyMeasurementEntity>
+
+    @Query("SELECT * FROM personal_records ORDER BY dateEpochDay DESC, id DESC")
+    suspend fun getAllPersonalRecords(): List<PersonalRecordEntity>
 
     @Query(
         """

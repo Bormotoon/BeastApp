@@ -3,7 +3,10 @@
 package com.beast.app.ui.settings
 
 import android.app.Application
+import android.net.Uri
 import android.text.format.DateFormat
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -13,11 +16,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -25,6 +30,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,6 +39,7 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,12 +54,20 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.beast.app.data.backup.BackupExporter
+import com.beast.app.data.backup.DataExportFormat
+import com.beast.app.data.backup.DataExportFormat.CSV_ARCHIVE
+import com.beast.app.data.backup.DataExportFormat.JSON
+import com.beast.app.data.db.DatabaseProvider
 import com.beast.app.data.preferences.NotificationPreferencesRepository
 import com.beast.app.data.preferences.TrainingReminderPreferences
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalTime
@@ -66,13 +82,42 @@ fun SettingsRoute(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val jsonLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(JSON.mimeType)) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.export(JSON, uri)
+        }
+    }
+    val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(CSV_ARCHIVE.mimeType)) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.export(CSV_ARCHIVE, uri)
+        }
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.events.collectLatest { event ->
+            when (event) {
+                is SettingsEvent.ExportSuccess -> snackbarHostState.showSnackbar("Экспорт завершен: ${event.format.displayName}")
+                is SettingsEvent.ExportFailure -> snackbarHostState.showSnackbar(event.message)
+            }
+        }
+    }
+
     SettingsScreen(
         state = state,
         onBack = onBack,
         onChangeProgram = onChangeProgram,
         onToggleTrainingReminder = viewModel::setTrainingReminderEnabled,
         onSelectTrainingTime = viewModel::setTrainingReminderTime,
-        onToggleTrainingDay = viewModel::toggleTrainingReminderDay
+        onToggleTrainingDay = viewModel::toggleTrainingReminderDay,
+        snackbarHostState = snackbarHostState,
+        onExportRequested = { format ->
+            val fileName = viewModel.suggestedFileName(format)
+            when (format) {
+                JSON -> jsonLauncher.launch(fileName)
+                CSV_ARCHIVE -> csvLauncher.launch(fileName)
+            }
+        }
     )
 }
 
@@ -83,7 +128,9 @@ private fun SettingsScreen(
     onChangeProgram: () -> Unit,
     onToggleTrainingReminder: (Boolean) -> Unit,
     onSelectTrainingTime: (LocalTime) -> Unit,
-    onToggleTrainingDay: (DayOfWeek) -> Unit
+    onToggleTrainingDay: (DayOfWeek) -> Unit,
+    snackbarHostState: SnackbarHostState,
+    onExportRequested: (DataExportFormat) -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -95,7 +142,8 @@ private fun SettingsScreen(
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
@@ -115,6 +163,9 @@ private fun SettingsScreen(
                     onSelectTime = onSelectTrainingTime,
                     onToggleDay = onToggleTrainingDay
                 )
+            }
+            item {
+                BackupCard(state = state.backup, onExportClick = onExportRequested)
             }
         }
     }
@@ -139,6 +190,62 @@ private fun ProgramCard(onChangeProgram: () -> Unit) {
             Button(onClick = onChangeProgram, modifier = Modifier.align(Alignment.End)) {
                 Text("Изменить программу")
             }
+        }
+    }
+}
+
+@Composable
+private fun BackupCard(
+    state: BackupUiState,
+    onExportClick: (DataExportFormat) -> Unit
+) {
+    val busy = state.isExportingJson || state.isExportingCsv
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(text = "Резервное копирование", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Экспортируйте данные приложения для сохранения на устройстве или в облаке.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Button(
+                onClick = { onExportClick(JSON) },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (state.isExportingJson) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Экспорт в JSON")
+                }
+            }
+            OutlinedButton(
+                onClick = { onExportClick(CSV_ARCHIVE) },
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (state.isExportingCsv) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Экспорт в CSV (ZIP)")
+                }
+            }
+            Text(
+                text = "CSV экспортируется в виде ZIP-архива с отдельными таблицами.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -270,12 +377,57 @@ private fun RowWithLabel(
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = NotificationPreferencesRepository(application)
+    private val backupExporter = BackupExporter(DatabaseProvider.get(application))
 
-    val uiState: StateFlow<SettingsUiState> = repository.preferencesFlow
-        .map { preferences ->
-            SettingsUiState(trainingReminder = TrainingReminderUiState.from(preferences.trainingReminder))
+    private val _uiState = MutableStateFlow(SettingsUiState())
+    val uiState: StateFlow<SettingsUiState> = _uiState
+
+    private val _events = MutableSharedFlow<SettingsEvent>()
+    val events: SharedFlow<SettingsEvent> = _events.asSharedFlow()
+
+    init {
+        viewModelScope.launch {
+            repository.preferencesFlow.collect { preferences ->
+                _uiState.update { current ->
+                    current.copy(
+                        trainingReminder = TrainingReminderUiState.from(preferences.trainingReminder)
+                    )
+                }
+            }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
+    }
+
+    fun suggestedFileName(format: DataExportFormat): String = format.defaultFileName()
+
+    fun export(format: DataExportFormat, uri: Uri) {
+        viewModelScope.launch {
+            setExportLoading(format, true)
+            try {
+                val resolver = getApplication<Application>().contentResolver
+                when (format) {
+                    JSON -> backupExporter.exportJson(resolver, uri)
+                    CSV_ARCHIVE -> backupExporter.exportCsvArchive(resolver, uri)
+                }
+                _events.emit(SettingsEvent.ExportSuccess(format))
+            } catch (t: Throwable) {
+                val fallback = "Ошибка экспорта"
+                val message = t.localizedMessage?.takeIf { it.isNotBlank() } ?: fallback
+                _events.emit(SettingsEvent.ExportFailure(format, message))
+            } finally {
+                setExportLoading(format, false)
+            }
+        }
+    }
+
+    private fun setExportLoading(format: DataExportFormat, isLoading: Boolean) {
+        _uiState.update { current ->
+            val updatedBackup = when (format) {
+                JSON -> current.backup.copy(isExportingJson = isLoading)
+                CSV_ARCHIVE -> current.backup.copy(isExportingCsv = isLoading)
+            }
+            current.copy(backup = updatedBackup)
+        }
+    }
 
     fun setTrainingReminderEnabled(enabled: Boolean) {
         viewModelScope.launch {
@@ -290,11 +442,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun toggleTrainingReminderDay(day: DayOfWeek) {
-        val current = uiState.value.trainingReminder.days
-        val updated = if (current.contains(day)) {
-            if (current.size == 1) current else current - day
+        val currentDays = uiState.value.trainingReminder.days
+        val updated = if (currentDays.contains(day)) {
+            if (currentDays.size == 1) currentDays else currentDays - day
         } else {
-            current + day
+            currentDays + day
         }
         viewModelScope.launch {
             repository.setTrainingReminderDays(updated)
@@ -302,8 +454,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 }
 
+sealed interface SettingsEvent {
+    data class ExportSuccess(val format: DataExportFormat) : SettingsEvent
+    data class ExportFailure(val format: DataExportFormat, val message: String) : SettingsEvent
+}
+
 data class SettingsUiState(
-    val trainingReminder: TrainingReminderUiState = TrainingReminderUiState()
+    val trainingReminder: TrainingReminderUiState = TrainingReminderUiState(),
+    val backup: BackupUiState = BackupUiState()
+)
+
+data class BackupUiState(
+    val isExportingJson: Boolean = false,
+    val isExportingCsv: Boolean = false
 )
 
 data class TrainingReminderUiState(
