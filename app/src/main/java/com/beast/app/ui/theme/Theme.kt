@@ -27,7 +27,8 @@ fun BeastAppTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = MaterialTheme.typography,
+        typography = BeastTypography,
+        shapes = BeastShapes,
         content = content
     )
 }
