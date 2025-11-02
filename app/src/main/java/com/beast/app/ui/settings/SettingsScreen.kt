@@ -50,11 +50,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.beast.app.data.backup.BackupExporter
+import com.beast.app.data.backup.BackupImporter
 import com.beast.app.data.backup.DataExportFormat
 import com.beast.app.data.backup.DataExportFormat.CSV_ARCHIVE
 import com.beast.app.data.backup.DataExportFormat.JSON
@@ -93,12 +95,25 @@ fun SettingsRoute(
             viewModel.export(CSV_ARCHIVE, uri)
         }
     }
+    val importMimeTypes = remember {
+        arrayOf("application/json", "text/json", "application/octet-stream", "application/zip")
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.import(uri)
+        }
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.events.collectLatest { event ->
             when (event) {
                 is SettingsEvent.ExportSuccess -> snackbarHostState.showSnackbar("Экспорт завершен: ${event.format.displayName}")
                 is SettingsEvent.ExportFailure -> snackbarHostState.showSnackbar(event.message)
+                is SettingsEvent.ImportSuccess -> {
+                    val label = event.fileName ?: "Импорт"
+                    snackbarHostState.showSnackbar("Импорт завершен: $label")
+                }
+                is SettingsEvent.ImportFailure -> snackbarHostState.showSnackbar(event.message)
             }
         }
     }
@@ -117,7 +132,8 @@ fun SettingsRoute(
                 JSON -> jsonLauncher.launch(fileName)
                 CSV_ARCHIVE -> csvLauncher.launch(fileName)
             }
-        }
+        },
+        onImportRequested = { importLauncher.launch(importMimeTypes) }
     )
 }
 
@@ -130,7 +146,8 @@ private fun SettingsScreen(
     onSelectTrainingTime: (LocalTime) -> Unit,
     onToggleTrainingDay: (DayOfWeek) -> Unit,
     snackbarHostState: SnackbarHostState,
-    onExportRequested: (DataExportFormat) -> Unit
+    onExportRequested: (DataExportFormat) -> Unit,
+    onImportRequested: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -165,7 +182,11 @@ private fun SettingsScreen(
                 )
             }
             item {
-                BackupCard(state = state.backup, onExportClick = onExportRequested)
+                BackupCard(
+                    state = state.backup,
+                    onExportClick = onExportRequested,
+                    onImportClick = onImportRequested
+                )
             }
         }
     }
@@ -197,9 +218,10 @@ private fun ProgramCard(onChangeProgram: () -> Unit) {
 @Composable
 private fun BackupCard(
     state: BackupUiState,
-    onExportClick: (DataExportFormat) -> Unit
+    onExportClick: (DataExportFormat) -> Unit,
+    onImportClick: () -> Unit
 ) {
-    val busy = state.isExportingJson || state.isExportingCsv
+    val busy = state.isExportingJson || state.isExportingCsv || state.isImporting
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
@@ -209,7 +231,7 @@ private fun BackupCard(
         ) {
             Text(text = "Резервное копирование", style = MaterialTheme.typography.titleMedium)
             Text(
-                text = "Экспортируйте данные приложения для сохранения на устройстве или в облаке.",
+                text = "Создавайте и восстанавливайте резервные копии данных приложения.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -243,6 +265,25 @@ private fun BackupCard(
             }
             Text(
                 text = "CSV экспортируется в виде ZIP-архива с отдельными таблицами.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            TextButton(
+                onClick = onImportClick,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (state.isImporting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Импорт из файла")
+                }
+            }
+            Text(
+                text = "Импорт поддерживает JSON-файлы, созданные приложением.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -378,6 +419,7 @@ private fun RowWithLabel(
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = NotificationPreferencesRepository(application)
     private val backupExporter = BackupExporter(DatabaseProvider.get(application))
+    private val backupImporter = BackupImporter(DatabaseProvider.get(application))
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState
@@ -429,6 +471,59 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun import(uri: Uri) {
+        viewModelScope.launch {
+            setImportLoading(true)
+            val application = getApplication<Application>()
+            val resolver = application.contentResolver
+            val document = DocumentFile.fromSingleUri(application, uri)
+            val mimeType = resolver.getType(uri)
+            val format = detectImportFormat(mimeType, document?.name)
+            val fileName = document?.name
+
+            if (format == CSV_ARCHIVE) {
+                setImportLoading(false)
+                _events.emit(SettingsEvent.ImportFailure("Импорт CSV пока не поддерживается. Выберите JSON-файл резервной копии."))
+                return@launch
+            }
+
+            if (format != JSON) {
+                setImportLoading(false)
+                _events.emit(SettingsEvent.ImportFailure("Не удалось определить формат файла. Выберите JSON-файл резервной копии."))
+                return@launch
+            }
+
+            try {
+                backupImporter.importJson(resolver, uri)
+                _events.emit(SettingsEvent.ImportSuccess(fileName))
+            } catch (t: Throwable) {
+                val fallback = "Ошибка импорта"
+                val message = t.localizedMessage?.takeIf { it.isNotBlank() } ?: fallback
+                _events.emit(SettingsEvent.ImportFailure(message))
+            } finally {
+                setImportLoading(false)
+            }
+        }
+    }
+
+    private fun setImportLoading(isLoading: Boolean) {
+        _uiState.update { current ->
+            current.copy(backup = current.backup.copy(isImporting = isLoading))
+        }
+    }
+
+    private fun detectImportFormat(mimeType: String?, displayName: String?): DataExportFormat? {
+        val type = mimeType?.lowercase(Locale.US)
+        if (type?.contains("json") == true) return JSON
+        if (type?.contains("zip") == true) return CSV_ARCHIVE
+        val name = displayName?.lowercase(Locale.US) ?: return null
+        return when {
+            name.endsWith(".json") -> JSON
+            name.endsWith(".zip") -> CSV_ARCHIVE
+            else -> null
+        }
+    }
+
     fun setTrainingReminderEnabled(enabled: Boolean) {
         viewModelScope.launch {
             repository.setTrainingReminderEnabled(enabled)
@@ -457,6 +552,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 sealed interface SettingsEvent {
     data class ExportSuccess(val format: DataExportFormat) : SettingsEvent
     data class ExportFailure(val format: DataExportFormat, val message: String) : SettingsEvent
+    data class ImportSuccess(val fileName: String?) : SettingsEvent
+    data class ImportFailure(val message: String) : SettingsEvent
 }
 
 data class SettingsUiState(
@@ -466,7 +563,8 @@ data class SettingsUiState(
 
 data class BackupUiState(
     val isExportingJson: Boolean = false,
-    val isExportingCsv: Boolean = false
+    val isExportingCsv: Boolean = false,
+    val isImporting: Boolean = false
 )
 
 data class TrainingReminderUiState(

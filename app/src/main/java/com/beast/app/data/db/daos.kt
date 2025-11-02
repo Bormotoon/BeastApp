@@ -14,6 +14,9 @@ interface ProgramDao {
     suspend fun upsertProgram(program: ProgramEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertPrograms(programs: List<ProgramEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertPhases(phases: List<PhaseEntity>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -66,6 +69,9 @@ interface WorkoutDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun addFavorite(workoutFavoriteEntity: WorkoutFavoriteEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertFavorites(favorites: List<WorkoutFavoriteEntity>)
+
     @Query("DELETE FROM favorite_workouts WHERE workoutId = :workoutId")
     suspend fun removeFavorite(workoutId: String)
 
@@ -109,6 +115,9 @@ interface WorkoutDao {
 interface WorkoutLogDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWorkoutLog(log: WorkoutLogEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWorkoutLogs(logs: List<WorkoutLogEntity>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSetLogs(logs: List<SetLogEntity>)
@@ -173,6 +182,9 @@ interface ProfileDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBodyWeight(entry: BodyWeightEntryEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBodyWeightEntries(entries: List<BodyWeightEntryEntity>)
+
     @Query("DELETE FROM body_weight WHERE dateEpochDay = :epochDay")
     suspend fun deleteBodyWeightByDate(epochDay: Long)
 
@@ -186,7 +198,13 @@ interface ProfileDao {
     suspend fun insertMeasurement(entry: BodyMeasurementEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMeasurements(entries: List<BodyMeasurementEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPersonalRecord(entry: PersonalRecordEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPersonalRecords(entries: List<PersonalRecordEntity>)
 
     @Query("DELETE FROM body_measurements WHERE dateEpochDay = :epochDay")
     suspend fun deleteMeasurementByDate(epochDay: Long)
@@ -202,6 +220,9 @@ interface ProfileDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProgressPhoto(photo: ProgressPhotoEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProgressPhotos(photos: List<ProgressPhotoEntity>)
 
     @Query("DELETE FROM progress_photos WHERE id = :photoId")
     suspend fun deleteProgressPhoto(photoId: Long)
