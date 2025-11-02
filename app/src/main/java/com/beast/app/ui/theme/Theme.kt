@@ -32,6 +32,59 @@ fun BeastAppTheme(
     )
 }
 
-private val LightColors = lightColorScheme()
-private val DarkColors = darkColorScheme()
+private val LightColors = lightColorScheme(
+    primary = BeastPrimaryLight,
+    onPrimary = BeastOnPrimaryLight,
+    primaryContainer = BeastPrimaryContainerLight,
+    onPrimaryContainer = BeastOnPrimaryContainerLight,
+    secondary = BeastSecondaryLight,
+    onSecondary = BeastOnSecondaryLight,
+    secondaryContainer = BeastSecondaryContainerLight,
+    onSecondaryContainer = BeastOnSecondaryContainerLight,
+    tertiary = BeastTertiaryLight,
+    onTertiary = BeastOnTertiaryLight,
+    tertiaryContainer = BeastTertiaryContainerLight,
+    onTertiaryContainer = BeastOnTertiaryContainerLight,
+    error = BeastErrorLight,
+    onError = BeastOnErrorLight,
+    errorContainer = BeastErrorContainerLight,
+    onErrorContainer = BeastOnErrorContainerLight,
+    background = BeastBackgroundLight,
+    onBackground = BeastOnBackgroundLight,
+    surface = BeastSurfaceLight,
+    onSurface = BeastOnSurfaceLight,
+    surfaceVariant = BeastSurfaceVariantLight,
+    onSurfaceVariant = BeastOnSurfaceVariantLight,
+    outline = BeastOutlineLight,
+    inverseSurface = BeastInverseSurfaceLight,
+    inverseOnSurface = BeastInverseOnSurfaceLight
+)
+
+private val DarkColors = darkColorScheme(
+    primary = BeastPrimaryDark,
+    onPrimary = BeastOnPrimaryDark,
+    primaryContainer = BeastPrimaryContainerDark,
+    onPrimaryContainer = BeastOnPrimaryContainerDark,
+    secondary = BeastSecondaryDark,
+    onSecondary = BeastOnSecondaryDark,
+    secondaryContainer = BeastSecondaryContainerDark,
+    onSecondaryContainer = BeastOnSecondaryContainerDark,
+    tertiary = BeastTertiaryDark,
+    onTertiary = BeastOnTertiaryDark,
+    tertiaryContainer = BeastTertiaryContainerDark,
+    onTertiaryContainer = BeastOnTertiaryContainerDark,
+    error = BeastErrorDark,
+    onError = BeastOnErrorDark,
+    errorContainer = BeastErrorContainerDark,
+    onErrorContainer = BeastOnErrorContainerDark,
+    background = BeastBackgroundDark,
+    onBackground = BeastOnBackgroundDark,
+    surface = BeastSurfaceDark,
+    onSurface = BeastOnSurfaceDark,
+    surfaceVariant = BeastSurfaceVariantDark,
+    onSurfaceVariant = BeastOnSurfaceVariantDark,
+    outline = BeastOutlineDark,
+    inverseSurface = BeastInverseSurfaceDark,
+    inverseOnSurface = BeastInverseOnSurfaceDark
+)
 
