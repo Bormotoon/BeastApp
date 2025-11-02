@@ -14,6 +14,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.outlined.MilitaryTech
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -46,6 +48,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -98,6 +102,7 @@ fun ActiveWorkoutRoute(
         onNextExercise = viewModel::nextExercise,
         onPreviousExercise = viewModel::previousExercise,
         onStartRest = { seconds -> viewModel.startRestTimer(totalSeconds = seconds ?: 60) },
+        onRestartRest = { seconds -> viewModel.startRestTimer(totalSeconds = seconds) },
         onExtendRest = viewModel::extendRest,
         onSkipRest = viewModel::skipRest,
         onShowRestDialog = viewModel::showRestDialog,
@@ -127,6 +132,7 @@ private fun ActiveWorkoutScreen(
     onNextExercise: () -> Unit,
     onPreviousExercise: () -> Unit,
     onStartRest: (Int?) -> Unit,
+    onRestartRest: (Int) -> Unit,
     onExtendRest: (Int) -> Unit,
     onSkipRest: () -> Unit,
     onShowRestDialog: () -> Unit,
@@ -255,6 +261,7 @@ private fun ActiveWorkoutScreen(
                             restTimer = state.restTimer,
                             recommendedRestSeconds = recommendedRestSeconds,
                             onStartRest = onStartRest,
+                            onRestartRest = onRestartRest,
                             onExtendRest = onExtendRest,
                             onSkipRest = onSkipRest,
                             onShowDialog = onShowRestDialog
@@ -299,7 +306,8 @@ private fun ActiveWorkoutScreen(
             restTimer = restTimer,
             onExtendRest = onExtendRest,
             onSkipRest = onSkipRest,
-            onHide = onHideRestDialog
+            onHide = onHideRestDialog,
+            onRestartRest = onRestartRest
         )
     }
 }
@@ -827,6 +835,7 @@ private fun RestTimerCard(
     restTimer: RestTimerState?,
     recommendedRestSeconds: Int?,
     onStartRest: (Int?) -> Unit,
+    onRestartRest: (Int) -> Unit,
     onExtendRest: (Int) -> Unit,
     onSkipRest: () -> Unit,
     onShowDialog: () -> Unit
@@ -841,38 +850,97 @@ private fun RestTimerCard(
                 style = MaterialTheme.typography.titleMedium
             )
             if (restTimer == null) {
-                    val suggestedText = recommendedRestSeconds?.let { "Старт ${it} сек" } ?: "Старт 60 сек"
-                    Text(
-                        text = recommendedRestSeconds?.let { "Рекомендованный отдых: ${it} сек" }
-                            ?: "Запустите таймер отдыха после подхода",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedButton(onClick = { onStartRest(recommendedRestSeconds) }) {
-                        Text(suggestedText)
+                val quickOptions = buildList {
+                    recommendedRestSeconds?.let { add(it) }
+                    addAll(listOf(30, 45, 60, 90))
+                }.distinct()
+                Text(
+                    text = if (recommendedRestSeconds != null) {
+                        "Рекомендованный отдых: ${recommendedRestSeconds} сек"
+                    } else {
+                        "Выберите длительность отдыха или запустите таймер по умолчанию"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (quickOptions.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        quickOptions.forEach { seconds ->
+                            val isRecommended = recommendedRestSeconds != null && seconds == recommendedRestSeconds
+                            AssistChip(
+                                onClick = { onStartRest(seconds) },
+                                label = { Text("${seconds} сек") },
+                                colors = if (isRecommended) {
+                                    AssistChipDefaults.assistChipColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        labelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                } else {
+                                    AssistChipDefaults.assistChipColors()
+                                }
+                            )
+                        }
+                    }
+                }
+                val defaultSeconds = recommendedRestSeconds ?: 60
+                OutlinedButton(onClick = { onStartRest(recommendedRestSeconds) }) {
+                    Text("Старт ${defaultSeconds} сек")
                 }
             } else {
                 val fraction = if (restTimer.totalSeconds == 0) 0f else restTimer.remainingSeconds.toFloat() / restTimer.totalSeconds
-                Text(
-                    text = "${formatTime(restTimer.remainingSeconds)} / ${formatTime(restTimer.totalSeconds)}",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                LinearProgressIndicator(progress = { fraction })
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = { onExtendRest(15) },
-                        modifier = Modifier.weight(1f)
+                val isFinished = !restTimer.isRunning && restTimer.remainingSeconds <= 0
+                if (isFinished) {
+                    Text(
+                        text = "Отдых завершён",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "Время отдыха истекло — переходите к следующему подходу.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text("+15 сек")
+                        val restartSeconds = restTimer.totalSeconds.takeIf { it > 0 } ?: 60
+                        Button(onClick = { onRestartRest(restartSeconds) }, modifier = Modifier.weight(1f)) {
+                            Text("Повторить")
+                        }
+                        OutlinedButton(onClick = onSkipRest, modifier = Modifier.weight(1f)) {
+                            Text("Сбросить")
+                        }
+                        OutlinedButton(onClick = onShowDialog, modifier = Modifier.weight(1f)) {
+                            Text("Развернуть")
+                        }
                     }
-                    OutlinedButton(onClick = onSkipRest, modifier = Modifier.weight(1f)) {
-                        Text("Пропустить")
-                    }
-                    OutlinedButton(onClick = onShowDialog, modifier = Modifier.weight(1f)) {
-                        Text("Развернуть")
+                } else {
+                    Text(
+                        text = "${formatTime(restTimer.remainingSeconds)} / ${formatTime(restTimer.totalSeconds)}",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    LinearProgressIndicator(progress = { fraction })
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { onExtendRest(15) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("+15 сек")
+                        }
+                        OutlinedButton(onClick = onSkipRest, modifier = Modifier.weight(1f)) {
+                            Text("Пропустить")
+                        }
+                        OutlinedButton(onClick = onShowDialog, modifier = Modifier.weight(1f)) {
+                            Text("Развернуть")
+                        }
                     }
                 }
             }
@@ -885,9 +953,11 @@ private fun RestTimerDialog(
     restTimer: RestTimerState,
     onExtendRest: (Int) -> Unit,
     onSkipRest: () -> Unit,
-    onHide: () -> Unit
+    onHide: () -> Unit,
+    onRestartRest: (Int) -> Unit
 ) {
     val progress = if (restTimer.totalSeconds == 0) 0f else restTimer.remainingSeconds.toFloat() / restTimer.totalSeconds
+    val isFinished = !restTimer.isRunning && restTimer.remainingSeconds <= 0
     Dialog(onDismissRequest = onHide) {
         Surface(shape = MaterialTheme.shapes.large) {
             Column(
@@ -904,28 +974,53 @@ private fun RestTimerDialog(
                     strokeWidth = 8.dp,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
-                Text(
-                    text = "${formatTime(restTimer.remainingSeconds)}",
-                    style = MaterialTheme.typography.displaySmall
-                )
-                Text(
-                    text = "Всего: ${formatTime(restTimer.totalSeconds)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedButton(onClick = { onExtendRest(15) }, modifier = Modifier.weight(1f)) {
-                        Text("+15 сек")
+                if (isFinished) {
+                    Text(
+                        text = "Отдых завершён",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Text(
+                        text = "Время отдыха истекло — можно продолжать тренировку.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        val restartSeconds = restTimer.totalSeconds.takeIf { it > 0 } ?: 60
+                        Button(onClick = { onRestartRest(restartSeconds) }, modifier = Modifier.weight(1f)) {
+                            Text("Повторить")
+                        }
+                        OutlinedButton(onClick = onSkipRest, modifier = Modifier.weight(1f)) {
+                            Text("Сбросить")
+                        }
                     }
-                    OutlinedButton(onClick = onSkipRest, modifier = Modifier.weight(1f)) {
-                        Text("Пропустить")
+                } else {
+                    Text(
+                        text = "${formatTime(restTimer.remainingSeconds)}",
+                        style = MaterialTheme.typography.displaySmall
+                    )
+                    Text(
+                        text = "Всего: ${formatTime(restTimer.totalSeconds)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(onClick = { onExtendRest(15) }, modifier = Modifier.weight(1f)) {
+                            Text("+15 сек")
+                        }
+                        OutlinedButton(onClick = onSkipRest, modifier = Modifier.weight(1f)) {
+                            Text("Пропустить")
+                        }
                     }
                 }
                 OutlinedButton(onClick = onHide, modifier = Modifier.fillMaxWidth()) {
-                    Text("Скрыть")
+                    Text(if (isFinished) "Закрыть" else "Скрыть")
                 }
             }
         }
