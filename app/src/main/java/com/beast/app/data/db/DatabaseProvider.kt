@@ -46,10 +46,17 @@ object DatabaseProvider {
 
     private val MIGRATION_5_6 = object : Migration(5, 6) {
         override fun migrate(db: SupportSQLiteDatabase) {
+            // Old installs may have created or altered `progress_photos` with a different schema
+            // (for example: an `id` column that is nullable). Room requires the on-disk schema
+            // to match the generated schema exactly. To be safe we rebuild the table:
+            // 1) create a temporary table with the correct schema
+            // 2) copy the data (excluding `id` so new autoincrement ids will be generated)
+            // 3) drop the old table
+            // 4) rename the temp table to the expected name
             db.execSQL(
                 """
-                CREATE TABLE IF NOT EXISTS progress_photos (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CREATE TABLE IF NOT EXISTS progress_photos_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                     dateEpochDay INTEGER NOT NULL,
                     angle TEXT NOT NULL,
                     uri TEXT NOT NULL,
@@ -58,6 +65,24 @@ object DatabaseProvider {
                 )
                 """.trimIndent()
             )
+
+            // Copy data from the old table if it exists. We copy only the non-PK columns so
+            // the new table will generate proper NOT NULL autoincrement ids. This is safe
+            // because no other table references progress_photos via foreign key.
+            try {
+                db.execSQL(
+                    """
+                    INSERT INTO progress_photos_new (dateEpochDay, angle, uri, createdAtEpochMillis, notes)
+                    SELECT dateEpochDay, angle, uri, createdAtEpochMillis, notes FROM progress_photos
+                    """.trimIndent()
+                )
+            } catch (ignored: Exception) {
+                // If the source table doesn't exist or columns differ, ignore and continue
+            }
+
+            // Replace old table with the new one.
+            db.execSQL("DROP TABLE IF EXISTS progress_photos")
+            db.execSQL("ALTER TABLE progress_photos_new RENAME TO progress_photos")
         }
     }
 

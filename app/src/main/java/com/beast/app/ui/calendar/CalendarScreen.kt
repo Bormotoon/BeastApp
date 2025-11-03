@@ -1,66 +1,63 @@
 package com.beast.app.ui.calendar
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.kizitonwose.calendar.compose.HorizontalCalendar
-import com.kizitonwose.calendar.compose.rememberCalendarState
 import com.beast.app.R
-import com.kizitonwose.calendar.core.CalendarDay
-import com.kizitonwose.calendar.core.DayPosition
-import com.kizitonwose.calendar.core.daysOfWeek
-import com.kizitonwose.calendar.core.firstDayOfWeekFromLocale
-import java.time.DayOfWeek
-import java.time.LocalDate
-import java.time.YearMonth
-import java.time.format.TextStyle
-import java.util.Locale
 import com.beast.app.utils.DateFormatting
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.Locale
 
 @Composable
 fun CalendarRoute(
@@ -88,21 +85,65 @@ fun CalendarScreen(
     onStartWorkout: (String) -> Unit,
     onViewWorkoutDetails: (String) -> Unit
 ) {
-    val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val zone = remember { ZoneId.systemDefault() }
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
-    val selectedSummary = selectedDate?.let { state.daySummaries[it] }
+    val defaultSelectedDate = remember(state.daySummaries, state.today) {
+        when {
+            state.daySummaries.containsKey(state.today) -> state.today
+            state.daySummaries.isNotEmpty() -> state.daySummaries.keys.minOrNull()
+            else -> null
+        }
+    }
 
-    if (selectedSummary != null) {
-        ModalBottomSheet(
-            onDismissRequest = { selectedDate = null },
-            sheetState = bottomSheetState
+    LaunchedEffect(state.daySummaries, defaultSelectedDate) {
+        val current = selectedDate
+        when {
+            state.daySummaries.isEmpty() -> selectedDate = null
+            current == null && defaultSelectedDate != null -> selectedDate = defaultSelectedDate
+            current != null && !state.daySummaries.containsKey(current) && defaultSelectedDate != null -> selectedDate = defaultSelectedDate
+        }
+    }
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    if (showDatePicker) {
+        val initialDate = selectedDate ?: defaultSelectedDate ?: state.today
+        val selectableDates = remember(state.startDate, state.endDate, state.daySummaries) {
+            object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                    val date = utcTimeMillis.toLocalDate(zone)
+                    val afterStart = state.startDate?.let { !date.isBefore(it) } ?: true
+                    val beforeEnd = state.endDate?.let { !date.isAfter(it) } ?: true
+                    return afterStart && beforeEnd && state.daySummaries.containsKey(date)
+                }
+            }
+        }
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = initialDate.toEpochMillis(zone),
+            selectableDates = selectableDates
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val millis = datePickerState.selectedDateMillis
+                        val picked = millis?.toLocalDate(zone)
+                        if (picked != null && state.daySummaries.containsKey(picked)) {
+                            selectedDate = picked
+                        }
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("Выбрать")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Отмена")
+                }
+            }
         ) {
-            DayDetailsSheet(
-                summary = selectedSummary,
-                onDismiss = { selectedDate = null },
-                onStartWorkout = onStartWorkout,
-                onViewWorkoutDetails = onViewWorkoutDetails
-            )
+            DatePicker(state = datePickerState)
         }
     }
 
@@ -160,7 +201,11 @@ fun CalendarScreen(
                     modifier = Modifier
                         .padding(innerPadding)
                         .padding(horizontal = 16.dp, vertical = 12.dp),
-                    onSelectDay = { date -> selectedDate = date }
+                    selectedDate = selectedDate,
+                    onShowDatePicker = { showDatePicker = true },
+                    onSelectDate = { selectedDate = it },
+                    onStartWorkout = onStartWorkout,
+                    onViewWorkoutDetails = onViewWorkoutDetails
                 )
             }
         }
@@ -171,97 +216,119 @@ fun CalendarScreen(
 private fun CalendarContent(
     state: CalendarUiState,
     modifier: Modifier = Modifier,
-    onSelectDay: (LocalDate) -> Unit
+    selectedDate: LocalDate?,
+    onShowDatePicker: () -> Unit,
+    onSelectDate: (LocalDate) -> Unit,
+    onStartWorkout: (String) -> Unit,
+    onViewWorkoutDetails: (String) -> Unit
 ) {
-    val firstDayOfWeek = remember { firstDayOfWeekFromLocale() }
-    val daysOfWeek = remember { daysOfWeek(firstDayOfWeek) }
-    val calendarState = rememberCalendarState(
-        startMonth = state.startMonth,
-        endMonth = state.endMonth,
-        firstVisibleMonth = state.initialMonth,
-        firstDayOfWeek = firstDayOfWeek
-    )
+    val summaries = state.daySummaries
+    val sortedDates = remember(summaries) { summaries.keys.sorted() }
+    val selectedSummary = selectedDate?.let { summaries[it] }
+    val hasToday = summaries.containsKey(state.today)
+    val currentIndex = selectedDate?.let { sortedDates.indexOf(it) } ?: -1
+    val previousDate = if (currentIndex > 0) sortedDates[currentIndex - 1] else null
+    val nextDate = if (currentIndex != -1 && currentIndex < sortedDates.lastIndex) sortedDates[currentIndex + 1] else null
 
     Column(modifier = modifier.fillMaxWidth()) {
-        HorizontalCalendar(
-            state = calendarState,
-            dayContent = { day ->
-                val summary = state.daySummaries[day.date]
-                DayCell(
-                    day = day,
-                    summary = summary,
-                    isToday = day.date == state.today,
-                    onSelect = onSelectDay
-                )
-            },
-            monthHeader = { month ->
-                MonthHeader(
-                    monthName = month.yearMonth,
-                    daysOfWeek = daysOfWeek
-                )
-            }
+        state.programName?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        ProgramProgressRow(summaries = summaries)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        DateSelectionRow(
+            selectedDate = selectedDate,
+            today = state.today,
+            hasToday = hasToday,
+            onSelectToday = { if (hasToday) onSelectDate(state.today) },
+            onShowPicker = onShowDatePicker,
+            onSelectPrevious = previousDate?.let { { onSelectDate(it) } },
+            onSelectNext = nextDate?.let { { onSelectDate(it) } }
         )
-        Spacer(modifier = Modifier.height(12.dp))
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (selectedSummary != null) {
+            DaySummaryCard(
+                summary = selectedSummary,
+                onStartWorkout = onStartWorkout,
+                onViewWorkoutDetails = onViewWorkoutDetails
+            )
+        } else {
+            Text(
+                text = "Выберите дату, чтобы увидеть детали",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
         Legend()
     }
 }
 
 @Composable
-private fun MonthHeader(monthName: java.time.YearMonth, daysOfWeek: List<DayOfWeek>) {
-    val locale = Locale.getDefault()
-    val formatter = remember(locale) { DateFormatting.dateFormatter(locale, "LLLLyyyy") }
-    Column(modifier = Modifier
-        .fillMaxWidth()
-        .padding(bottom = 8.dp)) {
-        Text(
-            text = DateFormatting.capitalize(monthName.format(formatter), locale),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold
-        )
+private fun ProgramProgressRow(summaries: Map<LocalDate, CalendarDaySummary>) {
+    if (summaries.isEmpty()) return
+    val totalDays = summaries.size
+    val completedDays = summaries.values.count { it.status == CalendarDayStatus.COMPLETED }
+    val progress = completedDays.toFloat() / totalDays.toFloat()
+    Column {
+        Text(text = "Прогресс программы", style = MaterialTheme.typography.titleSmall)
         Spacer(modifier = Modifier.height(4.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            daysOfWeek.forEach { dayOfWeek ->
-                Text(
-                    modifier = Modifier.weight(1f),
-                    text = dayOfWeek.getDisplayName(TextStyle.SHORT, locale).uppercase(locale),
-                    style = MaterialTheme.typography.labelSmall,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+        val progressValue = progress.coerceIn(0f, 1f)
+        LinearProgressIndicator(progress = { progressValue }, modifier = Modifier.fillMaxWidth())
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "$completedDays из $totalDays дней выполнено",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
 @Composable
-private fun DayCell(
-    day: CalendarDay,
-    summary: CalendarDaySummary?,
-    isToday: Boolean,
-    onSelect: (LocalDate) -> Unit
+private fun DateSelectionRow(
+    selectedDate: LocalDate?,
+    today: LocalDate,
+    hasToday: Boolean,
+    onSelectToday: () -> Unit,
+    onShowPicker: () -> Unit,
+    onSelectPrevious: (() -> Unit)?,
+    onSelectNext: (() -> Unit)?
 ) {
-    val colors = MaterialTheme.colorScheme
-    val background = summary?.status?.let { statusBackgroundColor(it, colors) } ?: Color.Transparent
-    val contentColor = summary?.status?.let { statusContentColor(it, colors) }
-        ?: if (day.position == DayPosition.MonthDate) colors.onSurface else colors.onSurface.copy(alpha = 0.4f)
-    val hasOutline = isToday && summary?.status != CalendarDayStatus.CURRENT
-
-    Box(
-        modifier = Modifier
-            .aspectRatio(1f)
-            .padding(4.dp)
-            .then(if (hasOutline) Modifier.border(1.5.dp, colors.primary, CircleShape) else Modifier)
-            .clip(CircleShape)
-            .background(background)
-            .clickable(enabled = summary != null) { onSelect(day.date) },
-        contentAlignment = Alignment.Center
+    val locale = Locale.getDefault()
+    val formatter = remember(locale) { DateFormatting.dateFormatter(locale, "yMMMMd") }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = day.date.dayOfMonth.toString(),
-            style = MaterialTheme.typography.bodyLarge,
-            color = contentColor,
-            fontWeight = if (summary?.status == CalendarDayStatus.CURRENT) FontWeight.Bold else FontWeight.Normal
-        )
+        IconButton(onClick = { onSelectPrevious?.invoke() }, enabled = onSelectPrevious != null) {
+            Icon(Icons.Filled.ChevronLeft, contentDescription = "Предыдущий день")
+        }
+
+        FilledTonalButton(onClick = onShowPicker) {
+            val label = selectedDate?.format(formatter)?.let { DateFormatting.capitalize(it, locale) } ?: "Выбрать дату"
+            Text(label, maxLines = 1)
+        }
+
+        IconButton(onClick = { onSelectNext?.invoke() }, enabled = onSelectNext != null) {
+            Icon(Icons.Filled.ChevronRight, contentDescription = "Следующий день")
+        }
+    }
+
+    if (hasToday && selectedDate != today) {
+        Spacer(modifier = Modifier.height(8.dp))
+        AssistChip(onClick = onSelectToday, label = { Text("Сегодня") })
     }
 }
 
@@ -301,75 +368,72 @@ private fun LegendRow(color: Color, label: String) {
 }
 
 @Composable
-private fun DayDetailsSheet(
+private fun DaySummaryCard(
     summary: CalendarDaySummary,
-    onDismiss: () -> Unit,
     onStartWorkout: (String) -> Unit,
     onViewWorkoutDetails: (String) -> Unit
 ) {
     val locale = Locale.getDefault()
     val dateFormatter = remember(locale) { DateFormatting.dateFormatter(locale, "yMMMMd") }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 16.dp)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Text(
-            text = DateFormatting.capitalize(summary.date.format(dateFormatter), locale),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold
-        )
-        summary.dayNumber?.let {
+        Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {
             Text(
-                text = "День $it",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = DateFormatting.capitalize(summary.date.format(dateFormatter), locale),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
             )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        AssistChip(
-            onClick = {},
-            label = { Text(text = summary.status.label()) },
-            colors = AssistChipDefaults.assistChipColors(
-                containerColor = statusBackgroundColor(summary.status, MaterialTheme.colorScheme),
-                labelColor = statusContentColor(summary.status, MaterialTheme.colorScheme)
+            summary.dayNumber?.let {
+                Text(
+                    text = "День $it",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            AssistChip(
+                onClick = {},
+                label = { Text(text = summary.status.label()) },
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = statusBackgroundColor(summary.status, MaterialTheme.colorScheme),
+                    labelColor = statusContentColor(summary.status, MaterialTheme.colorScheme)
+                )
             )
-        )
-        if (summary.isUnscheduled) {
+            if (summary.isUnscheduled) {
+                Text(
+                    text = "Выполнено вне расписания",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(top = 8.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Выполнено вне расписания",
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(top = 8.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = summary.workoutName ?: "День отдыха",
+                style = MaterialTheme.typography.titleMedium
             )
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = summary.workoutName ?: "День отдыха",
-            style = MaterialTheme.typography.titleMedium
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        StatsRow(summary)
-        Spacer(modifier = Modifier.height(16.dp))
-        when {
-            summary.workoutId == null -> {
-                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                    Text("Закрыть")
+            Spacer(modifier = Modifier.height(12.dp))
+            StatsRow(summary)
+            Spacer(modifier = Modifier.height(16.dp))
+            when {
+                summary.status == CalendarDayStatus.COMPLETED && summary.workoutId != null -> {
+                    Button(onClick = { onViewWorkoutDetails(summary.workoutId) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Просмотр")
+                    }
                 }
-            }
-            summary.status == CalendarDayStatus.COMPLETED -> {
-                Button(onClick = { onViewWorkoutDetails(summary.workoutId) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Просмотр")
+                summary.workoutId != null && summary.status != CalendarDayStatus.REST -> {
+                    Button(onClick = { onStartWorkout(summary.workoutId) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Начать")
+                    }
                 }
-            }
-            summary.status == CalendarDayStatus.REST -> {
-                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                    Text("Закрыть")
-                }
-            }
-            else -> {
-                Button(onClick = { onStartWorkout(summary.workoutId) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Начать")
+                else -> {
+                    Text(
+                        text = "Нет тренировки на эту дату",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -438,3 +502,7 @@ private fun CalendarDayStatus.label(): String = when (this) {
     CalendarDayStatus.UPCOMING -> "Запланировано"
     CalendarDayStatus.REST -> "Отдых"
 }
+
+private fun LocalDate.toEpochMillis(zone: ZoneId): Long = this.atStartOfDay(zone).toInstant().toEpochMilli()
+
+private fun Long.toLocalDate(zone: ZoneId): LocalDate = Instant.ofEpochMilli(this).atZone(zone).toLocalDate()

@@ -13,14 +13,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -165,7 +163,7 @@ private fun ProgramScreen(
                     ScrollableTabRow(
                         selectedTabIndex = selectedTab,
                         edgePadding = 16.dp,
-                        divider = { Divider(thickness = 0.dp) }
+                        divider = { HorizontalDivider(thickness = 0.dp) }
                     ) {
                         phases.forEachIndexed { index, phase ->
                             Tab(
@@ -204,8 +202,7 @@ private fun PhaseInfoCard(phase: PhaseUiModel) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
-                .padding(20.dp)
-                .verticalScroll(rememberScrollState()),
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(text = phase.name, style = MaterialTheme.typography.titleMedium)
