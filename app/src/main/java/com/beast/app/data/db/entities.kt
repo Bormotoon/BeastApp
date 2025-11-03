@@ -99,7 +99,11 @@ data class UserProfileEntity(
     val name: String,
     val startDateEpochDay: Long,
     val currentProgramId: String? = null,
-    val weightUnit: String
+    val weightUnit: String,
+    val avatarUri: String? = null,
+    val heightCm: Double? = null,
+    val age: Int? = null,
+    val gender: String? = null
 )
 
 @Entity(tableName = "body_weight")
@@ -119,7 +123,9 @@ data class BodyMeasurementEntity(
     val bicepsLeft: Double? = null,
     val bicepsRight: Double? = null,
     val thighsLeft: Double? = null,
-    val thighsRight: Double? = null
+    val thighsRight: Double? = null,
+    val calfLeft: Double? = null,
+    val calfRight: Double? = null
 )
 
 @Entity(tableName = "personal_records")
@@ -130,5 +136,21 @@ data class PersonalRecordEntity(
     val reps: Int,
     val estimated1RM: Double,
     val dateEpochDay: Long
+)
+
+@Entity(tableName = "favorite_workouts")
+data class WorkoutFavoriteEntity(
+    @PrimaryKey val workoutId: String,
+    val addedAtEpochMillis: Long
+)
+
+@Entity(tableName = "progress_photos")
+data class ProgressPhotoEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val dateEpochDay: Long,
+    val angle: String,
+    val uri: String,
+    val createdAtEpochMillis: Long,
+    val notes: String? = null
 )
 

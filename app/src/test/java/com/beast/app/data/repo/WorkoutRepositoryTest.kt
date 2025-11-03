@@ -13,6 +13,7 @@ class FakeWorkoutDao : WorkoutDao {
     private val workouts = mutableMapOf<String, WorkoutEntity>()
     private val mappings = mutableMapOf<String, MutableList<ExerciseInWorkoutEntity>>()
     private val exercises = mutableMapOf<String, ExerciseEntity>()
+    private val favorites = mutableMapOf<String, WorkoutFavoriteEntity>()
 
     override suspend fun upsertWorkout(workout: WorkoutEntity) {
         workouts[workout.id] = workout
@@ -26,16 +27,40 @@ class FakeWorkoutDao : WorkoutDao {
         list.forEach { mappings.computeIfAbsent(it.workoutId) { mutableListOf() }.add(it) }
     }
 
+    override suspend fun addFavorite(workoutFavoriteEntity: WorkoutFavoriteEntity) {
+        favorites[workoutFavoriteEntity.workoutId] = workoutFavoriteEntity
+    }
+
+    override suspend fun upsertFavorites(favorites: List<WorkoutFavoriteEntity>) {
+        favorites.forEach { this.favorites[it.workoutId] = it }
+    }
+
+    override suspend fun removeFavorite(workoutId: String) {
+        favorites.remove(workoutId)
+    }
+
+    override suspend fun isFavorite(workoutId: String): Boolean = favorites.containsKey(workoutId)
+
+    override suspend fun getFavoriteWorkoutIds(): List<String> = favorites.keys.toList()
+
     override suspend fun getWorkout(id: String): WorkoutEntity? = workouts[id]
 
     override suspend fun getWorkoutsByIds(ids: List<String>): List<WorkoutEntity> = ids.mapNotNull { workouts[it] }
+
+    override suspend fun getAllWorkouts(): List<WorkoutEntity> = workouts.values.toList()
 
     override suspend fun getExerciseMappings(workoutId: String): List<ExerciseInWorkoutEntity> = mappings[workoutId]?.toList() ?: emptyList()
 
     override suspend fun getExerciseMappingsForWorkouts(workoutIds: List<String>): List<ExerciseInWorkoutEntity> =
         workoutIds.flatMap { id -> mappings[id]?.toList() ?: emptyList() }
 
+    override suspend fun getAllExerciseMappings(): List<ExerciseInWorkoutEntity> = mappings.values.flatten()
+
     override suspend fun getExercisesByIds(ids: List<String>): List<ExerciseEntity> = ids.mapNotNull { exercises[it] }
+
+    override suspend fun getAllExercises(): List<ExerciseEntity> = exercises.values.toList()
+
+    override suspend fun getAllFavorites(): List<WorkoutFavoriteEntity> = favorites.values.sortedByDescending { it.addedAtEpochMillis }
 }
 
 class FakeWorkoutLogDao : WorkoutLogDao {
@@ -46,13 +71,57 @@ class FakeWorkoutLogDao : WorkoutLogDao {
         logs.add(log)
     }
 
+    override suspend fun insertWorkoutLogs(logs: List<WorkoutLogEntity>) {
+        logs.forEach { insertWorkoutLog(it) }
+    }
+
     override suspend fun insertSetLogs(logs: List<SetLogEntity>) {
         logs.forEach { setLogs.computeIfAbsent(it.workoutLogId) { mutableListOf() }.add(it) }
     }
 
+    override suspend fun getAllWorkoutLogs(): List<WorkoutLogEntity> =
+        logs.sortedByDescending { it.dateEpochMillis }
+
     override suspend fun getLogsForWorkout(workoutId: String): List<WorkoutLogEntity> = logs.filter { it.workoutId == workoutId }
 
     override suspend fun getSetLogs(workoutLogId: String): List<SetLogEntity> = setLogs[workoutLogId]?.toList() ?: emptyList()
+
+    override suspend fun getAllSetLogs(): List<SetLogEntity> =
+        setLogs.values.flatten().sortedWith(compareBy({ it.workoutLogId }, { it.setNumber }))
+
+    override suspend fun getSetLogAggregates(logIds: List<String>): List<WorkoutLogSetAggregate> {
+        return logIds.mapNotNull { id ->
+            val sets = setLogs[id] ?: return@mapNotNull null
+            WorkoutLogSetAggregate(
+                workoutLogId = id,
+                setCount = sets.size,
+                exerciseCount = sets.map { it.exerciseId }.toSet().size
+            )
+        }
+    }
+
+    override suspend fun getExerciseVolumeAggregates(logIds: List<String>): List<WorkoutLogExerciseAggregate> {
+        val results = mutableListOf<WorkoutLogExerciseAggregate>()
+        logIds.forEach { logId ->
+            val sets = setLogs[logId] ?: return@forEach
+            sets.groupBy { it.exerciseId }.forEach { (exerciseId, exerciseSets) ->
+                val totalVolume = exerciseSets.sumOf { (it.weight ?: 0.0) * (it.reps ?: 0) }
+                val totalReps = exerciseSets.sumOf { it.reps ?: 0 }
+                results.add(
+                    WorkoutLogExerciseAggregate(
+                        workoutLogId = logId,
+                        exerciseId = exerciseId,
+                        totalVolume = totalVolume,
+                        totalReps = totalReps
+                    )
+                )
+            }
+        }
+        return results
+    }
+
+    override suspend fun getLogsBetween(startMillis: Long, endMillis: Long): List<WorkoutLogEntity> =
+        logs.filter { it.dateEpochMillis in startMillis..endMillis }.sortedBy { it.dateEpochMillis }
 
     override suspend fun getLatestLogsForWorkouts(workoutIds: List<String>): List<WorkoutLogEntity> {
         return workoutIds.mapNotNull { id ->

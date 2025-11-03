@@ -5,8 +5,16 @@
 
 package com.beast.app.ui.activeworkout
 
+import android.content.Context
 import android.content.Intent
+import android.media.RingtoneManager
 import android.net.Uri
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +25,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -28,15 +37,19 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.outlined.MilitaryTech
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -56,6 +69,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.window.Dialog
+import com.beast.app.model.SetType
 
 @Composable
 fun ActiveWorkoutRoute(
@@ -72,15 +87,26 @@ fun ActiveWorkoutRoute(
         viewModel.acknowledgeCompletion()
     }
 
+    LaunchedEffect(state.restTimer?.shouldNotify) {
+        val shouldNotify = state.restTimer?.shouldNotify == true
+        if (shouldNotify) {
+            triggerRestTimerAlert(context)
+            viewModel.acknowledgeRestTimerAlert()
+        }
+    }
+
     ActiveWorkoutScreen(
         state = state,
         onBack = onBack,
         onToggleTimer = viewModel::toggleTimer,
         onNextExercise = viewModel::nextExercise,
         onPreviousExercise = viewModel::previousExercise,
-        onStartRest = { viewModel.startRestTimer() },
+        onStartRest = { seconds -> viewModel.startRestTimer(totalSeconds = seconds ?: 60) },
+        onRestartRest = { seconds -> viewModel.startRestTimer(totalSeconds = seconds) },
         onExtendRest = viewModel::extendRest,
         onSkipRest = viewModel::skipRest,
+        onShowRestDialog = viewModel::showRestDialog,
+        onHideRestDialog = viewModel::hideRestDialog,
         onFinishRequest = viewModel::requestFinish,
         onCancelFinish = viewModel::cancelFinish,
         onConfirmFinish = viewModel::confirmFinish,
@@ -105,9 +131,12 @@ private fun ActiveWorkoutScreen(
     onToggleTimer: () -> Unit,
     onNextExercise: () -> Unit,
     onPreviousExercise: () -> Unit,
-    onStartRest: () -> Unit,
+    onStartRest: (Int?) -> Unit,
+    onRestartRest: (Int) -> Unit,
     onExtendRest: (Int) -> Unit,
     onSkipRest: () -> Unit,
+    onShowRestDialog: () -> Unit,
+    onHideRestDialog: () -> Unit,
     onFinishRequest: () -> Unit,
     onCancelFinish: () -> Unit,
     onConfirmFinish: () -> Unit,
@@ -118,7 +147,18 @@ private fun ActiveWorkoutScreen(
     onToggleSetCompleted: (String, Int) -> Unit,
     onOpenVideo: (String) -> Unit
 ) {
-    val currentExercise = state.exercises.getOrNull(state.currentExerciseIndex)
+    val currentGroup = state.currentExerciseGroup()
+    val currentLeaderExercise = currentGroup.firstOrNull()
+    val currentOrderIndex = state.visibleExerciseIndices.indexOf(state.currentExerciseIndex).takeIf { it >= 0 } ?: 0
+    val totalExercises = when {
+        state.totalExercises > 0 -> state.totalExercises
+        state.visibleExerciseIndices.isNotEmpty() -> state.visibleExerciseIndices.size
+        else -> state.exercises.size
+    }
+    val currentExercisePosition = if (totalExercises == 0) 0 else currentOrderIndex + 1
+    val recommendedRestSeconds = currentLeaderExercise?.restSuggestionSeconds
+    val hasPreviousExercise = totalExercises > 0 && currentOrderIndex > 0
+    val hasNextExercise = totalExercises > 0 && currentOrderIndex < totalExercises - 1
 
     Scaffold(
         topBar = {
@@ -158,7 +198,7 @@ private fun ActiveWorkoutScreen(
                     message = state.errorMessage
                 )
             }
-            currentExercise == null -> {
+            currentGroup.isEmpty() -> {
                 ErrorState(
                     modifier = Modifier
                         .fillMaxSize()
@@ -177,46 +217,60 @@ private fun ActiveWorkoutScreen(
                     item {
                         TopSection(
                             state = state,
-                            currentExercisePosition = state.currentExerciseIndex + 1,
+                            currentExercisePosition = currentExercisePosition,
                             onToggleTimer = onToggleTimer,
                             onFinishRequest = onFinishRequest
                         )
                     }
                     item {
-                        ExerciseOverviewCard(
-                            exercise = currentExercise,
+                        ExerciseGroupOverviewCard(
+                            exercises = currentGroup,
                             weightUnit = state.weightUnit,
+                            recommendedRestSeconds = recommendedRestSeconds,
                             onOpenVideo = onOpenVideo
                         )
                     }
-                    item {
-                        SetsTableHeader()
+                    if (currentLeaderExercise?.setType == SetType.PROGRESSIVE) {
+                        item {
+                            ProgressivePyramidIndicator(
+                                sets = currentLeaderExercise.sets,
+                                restSeconds = recommendedRestSeconds
+                            )
+                        }
                     }
-                    itemsIndexed(currentExercise.sets, key = { index, set -> "${currentExercise.id}_${set.setNumber}_${index}" }) { index, set ->
-                        SetRow(
-                            state = state,
-                            exerciseId = currentExercise.id,
-                            setIndex = index,
-                            setState = set,
-                            onWeightChange = onWeightChange,
-                            onAdjustWeight = onAdjustWeight,
-                            onRepsChange = onRepsChange,
-                            onAdjustReps = onAdjustReps,
-                            onToggleSetCompleted = onToggleSetCompleted
-                        )
+                    currentGroup.forEach { exercise ->
+                        item(key = "${exercise.id}_header") {
+                            SetsTableHeader(exerciseName = if (currentGroup.size > 1) exercise.name else null)
+                        }
+                        itemsIndexed(exercise.sets, key = { index, set -> "${exercise.id}_${set.setNumber}_${index}" }) { index, set ->
+                            SetRow(
+                                state = state,
+                                exerciseId = exercise.id,
+                                setIndex = index,
+                                setState = set,
+                                onWeightChange = onWeightChange,
+                                onAdjustWeight = onAdjustWeight,
+                                onRepsChange = onRepsChange,
+                                onAdjustReps = onAdjustReps,
+                                onToggleSetCompleted = onToggleSetCompleted
+                            )
+                        }
                     }
                     item {
                         RestTimerCard(
                             restTimer = state.restTimer,
+                            recommendedRestSeconds = recommendedRestSeconds,
                             onStartRest = onStartRest,
+                            onRestartRest = onRestartRest,
                             onExtendRest = onExtendRest,
-                            onSkipRest = onSkipRest
+                            onSkipRest = onSkipRest,
+                            onShowDialog = onShowRestDialog
                         )
                     }
                     item {
                         NavigationControls(
-                            hasPrevious = state.currentExerciseIndex > 0,
-                            hasNext = state.currentExerciseIndex < state.totalExercises - 1,
+                            hasPrevious = hasPreviousExercise,
+                            hasNext = hasNextExercise,
                             onPrevious = onPreviousExercise,
                             onNext = onNextExercise
                         )
@@ -243,6 +297,17 @@ private fun ActiveWorkoutScreen(
                     Text("Отмена")
                 }
             }
+        )
+    }
+
+    val restTimer = state.restTimer
+    if (restTimer?.showDialog == true) {
+        RestTimerDialog(
+            restTimer = restTimer,
+            onExtendRest = onExtendRest,
+            onSkipRest = onSkipRest,
+            onHide = onHideRestDialog,
+            onRestartRest = onRestartRest
         )
     }
 }
@@ -327,72 +392,154 @@ private fun TopSection(
 }
 
 @Composable
-private fun ExerciseOverviewCard(
-    exercise: ActiveExerciseState,
+private fun ExerciseGroupOverviewCard(
+    exercises: List<ActiveExerciseState>,
     weightUnit: String,
+    recommendedRestSeconds: Int?,
     onOpenVideo: (String) -> Unit
 ) {
+    val leader = exercises.firstOrNull() ?: return
+    val specialHint = specialSetHint(leader.setType, recommendedRestSeconds)
+
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = exercise.name,
-                style = MaterialTheme.typography.titleLarge
-            )
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    shape = MaterialTheme.shapes.small
-                ) {
+            if (exercises.size == 1) {
+                SingleExerciseOverview(
+                    exercise = leader,
+                    weightUnit = weightUnit,
+                    onOpenVideo = onOpenVideo
+                )
+                if (specialHint != null || (recommendedRestSeconds != null && recommendedRestSeconds > 0)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        specialHint?.let {
+                            Text(
+                                text = it,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        recommendedRestSeconds?.takeIf { it > 0 }?.let { restSeconds ->
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                shape = MaterialTheme.shapes.small
+                            ) {
+                                Text(
+                                    text = "Рекомендованный отдых: ${restSeconds} сек",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text(
+                    text = leader.setTypeLabel,
+                    style = MaterialTheme.typography.titleLarge
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            text = leader.setTypeLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                    recommendedRestSeconds?.takeIf { it > 0 }?.let { restSeconds ->
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Text(
+                                text = "Отдых: ${restSeconds} сек",
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+                specialHint?.let {
                     Text(
-                        text = exercise.setTypeLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        text = it,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                if (exercise.primaryMuscle.isNotBlank()) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        shape = MaterialTheme.shapes.small
-                    ) {
+                exercises.forEachIndexed { index, exercise ->
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = exercise.primaryMuscle,
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            text = exercise.name,
+                            style = MaterialTheme.typography.titleMedium
                         )
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            exercise.primaryMuscle.takeIf { it.isNotBlank() }?.let { muscle ->
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    shape = MaterialTheme.shapes.small
+                                ) {
+                                    Text(
+                                        text = muscle,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                            if (weightUnit.isNotBlank()) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    shape = MaterialTheme.shapes.small
+                                ) {
+                                    Text(
+                                        text = "Вес: ${weightUnit.uppercase()}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                            if (exercise.equipment.isNotEmpty()) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    shape = MaterialTheme.shapes.small
+                                ) {
+                                    Text(
+                                        text = exercise.equipment.joinToString(", "),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                        exercise.notes?.takeIf { it.isNotBlank() }?.let {
+                            Text(text = it, style = MaterialTheme.typography.bodyMedium)
+                        }
+                        exercise.instructions?.takeIf { it.isNotBlank() }?.let {
+                            Text(
+                                text = it,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        exercise.videoUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                            OutlinedButton(onClick = { onOpenVideo(url) }) {
+                                Text("Видео-инструкция")
+                            }
+                        }
                     }
-                }
-                if (weightUnit.isNotBlank()) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        shape = MaterialTheme.shapes.small
-                    ) {
-                        Text(
-                            text = "Вес: ${weightUnit.uppercase()}",
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                    if (index < exercises.lastIndex) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                     }
-                }
-            }
-            exercise.notes?.takeIf { it.isNotBlank() }?.let {
-                Text(text = it, style = MaterialTheme.typography.bodyMedium)
-            }
-            exercise.instructions?.takeIf { it.isNotBlank() }?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            exercise.videoUrl?.takeIf { it.isNotBlank() }?.let { url ->
-                OutlinedButton(onClick = { onOpenVideo(url) }) {
-                    Text("Видео-инструкция")
                 }
             }
         }
@@ -400,19 +547,113 @@ private fun ExerciseOverviewCard(
 }
 
 @Composable
-private fun SetsTableHeader() {
-    Row(
+private fun SingleExerciseOverview(
+    exercise: ActiveExerciseState,
+    weightUnit: String,
+    onOpenVideo: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = exercise.name,
+            style = MaterialTheme.typography.titleLarge
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                shape = MaterialTheme.shapes.small
+            ) {
+                Text(
+                    text = exercise.setTypeLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+            exercise.primaryMuscle.takeIf { it.isNotBlank() }?.let { muscle ->
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = muscle,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+            if (exercise.equipment.isNotEmpty()) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = exercise.equipment.joinToString(", "),
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+            if (weightUnit.isNotBlank()) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = "Вес: ${weightUnit.uppercase()}",
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+        exercise.notes?.takeIf { it.isNotBlank() }?.let {
+            Text(text = it, style = MaterialTheme.typography.bodyMedium)
+        }
+        exercise.instructions?.takeIf { it.isNotBlank() }?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        exercise.videoUrl?.takeIf { it.isNotBlank() }?.let { url ->
+            OutlinedButton(onClick = { onOpenVideo(url) }) {
+                Text("Видео-инструкция")
+            }
+        }
+    }
+}
+
+@Composable
+private fun SetsTableHeader(exerciseName: String? = null) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 4.dp)
     ) {
-        TableHeaderCell(text = "#", weight = 0.5f)
-        TableHeaderCell(text = "Прошлое", weight = 1.2f)
-        TableHeaderCell(text = "Цель", weight = 0.8f)
-        TableHeaderCell(text = "Вес", weight = 1.2f)
-        TableHeaderCell(text = "Повторы", weight = 1.0f)
-        TableHeaderCell(text = "✔", weight = 0.5f, textAlign = TextAlign.Center)
+        exerciseName?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TableHeaderCell(text = "#", weight = 0.6f)
+            TableHeaderCell(text = "Прошлое", weight = 1.3f)
+            TableHeaderCell(text = "Цель", weight = 0.9f)
+            TableHeaderCell(text = "Вес", weight = 1.2f)
+            TableHeaderCell(text = "Повторы", weight = 1.0f)
+            TableHeaderCell(text = "Действие", weight = 1.3f, textAlign = TextAlign.Center)
+        }
     }
 }
 
@@ -439,49 +680,78 @@ private fun SetRow(
     onAdjustReps: (String, Int, Int) -> Unit,
     onToggleSetCompleted: (String, Int) -> Unit
 ) {
-    Row(
+    val backgroundColor = if (setState.completed) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val border = if (setState.isNewRecord) {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.secondary)
+    } else {
+        null
+    }
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp, horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+        shape = MaterialTheme.shapes.small,
+        color = backgroundColor,
+        tonalElevation = if (setState.completed) 2.dp else 0.dp,
+        border = border
     ) {
-        Text(
-            text = setState.setNumber.toString(),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(0.5f)
-        )
-        Text(
-            text = setState.previousSummary,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1.2f)
-        )
-        Text(
-            text = setState.goalReps ?: "—",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(0.8f)
-        )
-        StepField(
-            label = state.weightUnit.uppercase(),
-            value = setState.weightInput,
-            onValueChange = { onWeightChange(exerciseId, setIndex, it) },
-            onIncrement = { onAdjustWeight(exerciseId, setIndex, 1.0) },
-            onDecrement = { onAdjustWeight(exerciseId, setIndex, -1.0) },
-            modifier = Modifier.weight(1.2f)
-        )
-        StepField(
-            label = "Повт.",
-            value = setState.repsInput,
-            onValueChange = { onRepsChange(exerciseId, setIndex, it) },
-            onIncrement = { onAdjustReps(exerciseId, setIndex, 1) },
-            onDecrement = { onAdjustReps(exerciseId, setIndex, -1) },
-            modifier = Modifier.weight(1.0f),
-            allowDecimal = false
-        )
-        Checkbox(
-            checked = setState.completed,
-            onCheckedChange = { onToggleSetCompleted(exerciseId, setIndex) },
-            modifier = Modifier.weight(0.5f)
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = setState.setNumber.toString(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(0.6f)
+                )
+                Text(
+                    text = setState.previousSummary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1.3f)
+                )
+                Text(
+                    text = setState.goalReps ?: "—",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(0.9f)
+                )
+                StepField(
+                    label = state.weightUnit.uppercase(),
+                    value = setState.weightInput,
+                    onValueChange = { onWeightChange(exerciseId, setIndex, it) },
+                    onIncrement = { onAdjustWeight(exerciseId, setIndex, 1.0) },
+                    onDecrement = { onAdjustWeight(exerciseId, setIndex, -1.0) },
+                    modifier = Modifier.weight(1.2f)
+                )
+                StepField(
+                    label = "Повт.",
+                    value = setState.repsInput,
+                    onValueChange = { onRepsChange(exerciseId, setIndex, it) },
+                    onIncrement = { onAdjustReps(exerciseId, setIndex, 1) },
+                    onDecrement = { onAdjustReps(exerciseId, setIndex, -1) },
+                    modifier = Modifier.weight(1.0f),
+                    allowDecimal = false
+                )
+                FinishSetButton(
+                    completed = setState.completed,
+                    onToggle = { onToggleSetCompleted(exerciseId, setIndex) },
+                    modifier = Modifier.weight(1.3f)
+                )
+            }
+            if (setState.isNewRecord) {
+                RecordBadge()
+            }
+        }
     }
 }
 
@@ -527,11 +797,48 @@ private fun StepField(
 }
 
 @Composable
+private fun FinishSetButton(completed: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    if (completed) {
+        OutlinedButton(onClick = onToggle, modifier = modifier) {
+            Text("Сбросить")
+        }
+    } else {
+        Button(onClick = onToggle, modifier = modifier) {
+            Text("Завершить")
+        }
+    }
+}
+
+@Composable
+private fun RecordBadge() {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        shape = MaterialTheme.shapes.small
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(imageVector = Icons.Outlined.MilitaryTech, contentDescription = null)
+            Text(
+                text = "Новый рекорд!",
+                style = MaterialTheme.typography.labelMedium
+            )
+        }
+    }
+}
+
+@Composable
 private fun RestTimerCard(
     restTimer: RestTimerState?,
-    onStartRest: () -> Unit,
+    recommendedRestSeconds: Int?,
+    onStartRest: (Int?) -> Unit,
+    onRestartRest: (Int) -> Unit,
     onExtendRest: (Int) -> Unit,
-    onSkipRest: () -> Unit
+    onSkipRest: () -> Unit,
+    onShowDialog: () -> Unit
 ) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -543,31 +850,177 @@ private fun RestTimerCard(
                 style = MaterialTheme.typography.titleMedium
             )
             if (restTimer == null) {
+                val quickOptions = buildList {
+                    recommendedRestSeconds?.let { add(it) }
+                    addAll(listOf(30, 45, 60, 90))
+                }.distinct()
                 Text(
-                    text = "Запустите таймер отдыха после подхода",
+                    text = if (recommendedRestSeconds != null) {
+                        "Рекомендованный отдых: ${recommendedRestSeconds} сек"
+                    } else {
+                        "Выберите длительность отдыха или запустите таймер по умолчанию"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                OutlinedButton(onClick = onStartRest) {
-                    Text("Старт 60 сек")
+                if (quickOptions.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        quickOptions.forEach { seconds ->
+                            val isRecommended = recommendedRestSeconds != null && seconds == recommendedRestSeconds
+                            AssistChip(
+                                onClick = { onStartRest(seconds) },
+                                label = { Text("${seconds} сек") },
+                                colors = if (isRecommended) {
+                                    AssistChipDefaults.assistChipColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        labelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                } else {
+                                    AssistChipDefaults.assistChipColors()
+                                }
+                            )
+                        }
+                    }
+                }
+                val defaultSeconds = recommendedRestSeconds ?: 60
+                OutlinedButton(onClick = { onStartRest(recommendedRestSeconds) }) {
+                    Text("Старт ${defaultSeconds} сек")
                 }
             } else {
                 val fraction = if (restTimer.totalSeconds == 0) 0f else restTimer.remainingSeconds.toFloat() / restTimer.totalSeconds
-                Text(
-                    text = "${formatTime(restTimer.remainingSeconds)} / ${formatTime(restTimer.totalSeconds)}",
-                    style = MaterialTheme.typography.titleMedium
+                val isFinished = !restTimer.isRunning && restTimer.remainingSeconds <= 0
+                if (isFinished) {
+                    Text(
+                        text = "Отдых завершён",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "Время отдыха истекло — переходите к следующему подходу.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        val restartSeconds = restTimer.totalSeconds.takeIf { it > 0 } ?: 60
+                        Button(onClick = { onRestartRest(restartSeconds) }, modifier = Modifier.weight(1f)) {
+                            Text("Повторить")
+                        }
+                        OutlinedButton(onClick = onSkipRest, modifier = Modifier.weight(1f)) {
+                            Text("Сбросить")
+                        }
+                        OutlinedButton(onClick = onShowDialog, modifier = Modifier.weight(1f)) {
+                            Text("Развернуть")
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "${formatTime(restTimer.remainingSeconds)} / ${formatTime(restTimer.totalSeconds)}",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    LinearProgressIndicator(progress = { fraction })
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { onExtendRest(15) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("+15 сек")
+                        }
+                        OutlinedButton(onClick = onSkipRest, modifier = Modifier.weight(1f)) {
+                            Text("Пропустить")
+                        }
+                        OutlinedButton(onClick = onShowDialog, modifier = Modifier.weight(1f)) {
+                            Text("Развернуть")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RestTimerDialog(
+    restTimer: RestTimerState,
+    onExtendRest: (Int) -> Unit,
+    onSkipRest: () -> Unit,
+    onHide: () -> Unit,
+    onRestartRest: (Int) -> Unit
+) {
+    val progress = if (restTimer.totalSeconds == 0) 0f else restTimer.remainingSeconds.toFloat() / restTimer.totalSeconds
+    val isFinished = !restTimer.isRunning && restTimer.remainingSeconds <= 0
+    Dialog(onDismissRequest = onHide) {
+        Surface(shape = MaterialTheme.shapes.large) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                Text(text = "Отдых", style = MaterialTheme.typography.headlineSmall)
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.size(160.dp),
+                    strokeWidth = 8.dp,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
-                LinearProgressIndicator(progress = { fraction })
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedButton(onClick = { onExtendRest(15) }) {
-                        Text("+15 сек")
+                if (isFinished) {
+                    Text(
+                        text = "Отдых завершён",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Text(
+                        text = "Время отдыха истекло — можно продолжать тренировку.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        val restartSeconds = restTimer.totalSeconds.takeIf { it > 0 } ?: 60
+                        Button(onClick = { onRestartRest(restartSeconds) }, modifier = Modifier.weight(1f)) {
+                            Text("Повторить")
+                        }
+                        OutlinedButton(onClick = onSkipRest, modifier = Modifier.weight(1f)) {
+                            Text("Сбросить")
+                        }
                     }
-                    OutlinedButton(onClick = onSkipRest) {
-                        Text("Пропустить")
+                } else {
+                    Text(
+                        text = "${formatTime(restTimer.remainingSeconds)}",
+                        style = MaterialTheme.typography.displaySmall
+                    )
+                    Text(
+                        text = "Всего: ${formatTime(restTimer.totalSeconds)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(onClick = { onExtendRest(15) }, modifier = Modifier.weight(1f)) {
+                            Text("+15 сек")
+                        }
+                        OutlinedButton(onClick = onSkipRest, modifier = Modifier.weight(1f)) {
+                            Text("Пропустить")
+                        }
                     }
+                }
+                OutlinedButton(onClick = onHide, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (isFinished) "Закрыть" else "Скрыть")
                 }
             }
         }
@@ -621,4 +1074,112 @@ private fun formatTime(totalSeconds: Int): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return "%d:%02d".format(minutes, seconds)
+}
+
+private fun specialSetHint(type: SetType, restSeconds: Int?): String? = when (type) {
+    SetType.SUPER -> "Выполняйте упражнения подряд без отдыха. Отдыхайте ${(restSeconds ?: 60)} сек после завершения раунда."
+    SetType.GIANT -> "Три упражнения без паузы. Сделайте паузу ${(restSeconds ?: 60)} сек после связки."
+    SetType.FORCE -> "Force Set: 5 подходов × 5 повторений. Отдых ${(restSeconds ?: 10)} сек между подходами."
+    SetType.PROGRESSIVE -> "Пирамида повторений 15→12→8→8→12→15. Отдых ${(restSeconds ?: 90)} сек в середине."
+    else -> null
+}
+
+private fun ActiveWorkoutUiState.currentExerciseGroup(): List<ActiveExerciseState> {
+    val current = exercises.getOrNull(currentExerciseIndex) ?: return emptyList()
+    val groupId = current.groupId
+    if (groupId.isNullOrBlank()) return listOf(current)
+    val groupMembers = exercises.filter { it.groupId == groupId }
+    return if (groupMembers.isEmpty()) listOf(current) else groupMembers
+}
+
+private fun triggerRestTimerAlert(context: Context) {
+    playRestTimerTone(context)
+    vibrateForRestTimer(context)
+}
+
+private fun playRestTimerTone(context: Context) {
+    runCatching {
+        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        val ringtone = RingtoneManager.getRingtone(context, uri)
+        ringtone?.play()
+    }
+}
+
+private fun vibrateForRestTimer(context: Context) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val manager = context.getSystemService(VibratorManager::class.java)
+        val vibrator = manager?.defaultVibrator
+        if (vibrator?.hasVibrator() != true) return
+        val effect = VibrationEffect.createOneShot(500L, VibrationEffect.DEFAULT_AMPLITUDE)
+        vibrator.vibrate(effect)
+    } else {
+        @Suppress("DEPRECATION")
+        val legacyVibrator = context.getSystemService(Vibrator::class.java)
+        if (legacyVibrator?.hasVibrator() != true) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val effect = VibrationEffect.createOneShot(500L, VibrationEffect.DEFAULT_AMPLITUDE)
+            legacyVibrator.vibrate(effect)
+        } else {
+            @Suppress("DEPRECATION")
+            legacyVibrator.vibrate(500L)
+        }
+    }
+}
+
+@Composable
+private fun ProgressivePyramidIndicator(
+    sets: List<ActiveSetState>,
+    restSeconds: Int?
+) {
+    val stepLabels = sets.map { it.goalReps ?: it.setNumber.toString() }
+    val currentIndex = sets.indexOfFirst { !it.completed }.takeIf { it >= 0 } ?: sets.lastIndex
+    val restLabel = restSeconds?.takeIf { it > 0 }?.let { seconds -> "Отдых ${seconds} сек" } ?: "Отдых"
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Прогрессивная пирамида",
+                style = MaterialTheme.typography.titleMedium
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                stepLabels.forEachIndexed { index, label ->
+                    val isCurrent = index == currentIndex
+                    val isCompleted = sets.getOrNull(index)?.completed == true
+                    val background = when {
+                        isCurrent -> MaterialTheme.colorScheme.primaryContainer
+                        isCompleted -> MaterialTheme.colorScheme.secondaryContainer
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
+                    val contentColor = when {
+                        isCurrent -> MaterialTheme.colorScheme.onPrimaryContainer
+                        isCompleted -> MaterialTheme.colorScheme.onSecondaryContainer
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                    Surface(color = background, contentColor = contentColor, shape = MaterialTheme.shapes.small) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                    if (stepLabels.size >= 4 && index == (stepLabels.size / 2) - 1) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Text(
+                                text = restLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

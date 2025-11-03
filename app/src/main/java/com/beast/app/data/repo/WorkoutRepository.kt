@@ -68,6 +68,10 @@ class WorkoutRepository private constructor(
         }
     }
 
+    suspend fun getAllWorkoutLogs(): List<WorkoutLogEntity> = withContext(Dispatchers.IO) {
+        workoutLogDao.getAllWorkoutLogs()
+    }
+
     suspend fun getLogsForWorkout(workoutId: String): List<WorkoutLogEntity> = withContext(Dispatchers.IO) {
         workoutLogDao.getLogsForWorkout(workoutId)
     }
@@ -76,9 +80,55 @@ class WorkoutRepository private constructor(
         workoutLogDao.getSetLogs(workoutLogId)
     }
 
+    suspend fun getSetAggregates(logIds: List<String>): Map<String, WorkoutLogSetAggregate> = withContext(Dispatchers.IO) {
+        if (logIds.isEmpty()) return@withContext emptyMap()
+        workoutLogDao.getSetLogAggregates(logIds).associateBy { it.workoutLogId }
+    }
+
+    suspend fun getExerciseVolumeAggregates(logIds: List<String>): List<WorkoutLogExerciseAggregate> = withContext(Dispatchers.IO) {
+        if (logIds.isEmpty()) return@withContext emptyList()
+        workoutLogDao.getExerciseVolumeAggregates(logIds)
+    }
+
+    suspend fun getLogsBetween(startMillis: Long, endMillis: Long): List<WorkoutLogEntity> = withContext(Dispatchers.IO) {
+        if (startMillis > endMillis) return@withContext emptyList()
+        workoutLogDao.getLogsBetween(startMillis, endMillis)
+    }
+
+    suspend fun getWorkoutsByIds(workoutIds: List<String>): List<WorkoutEntity> = withContext(Dispatchers.IO) {
+        if (workoutIds.isEmpty()) return@withContext emptyList()
+        workoutDao.getWorkoutsByIds(workoutIds)
+    }
+
+    suspend fun getExercisesByIds(exerciseIds: List<String>): List<ExerciseEntity> = withContext(Dispatchers.IO) {
+        if (exerciseIds.isEmpty()) return@withContext emptyList()
+        workoutDao.getExercisesByIds(exerciseIds)
+    }
+
     suspend fun getLatestLogsForWorkouts(workoutIds: List<String>): Map<String, WorkoutLogEntity> = withContext(Dispatchers.IO) {
         if (workoutIds.isEmpty()) return@withContext emptyMap()
         workoutLogDao.getLatestLogsForWorkouts(workoutIds).associateBy { it.workoutId }
+    }
+
+    suspend fun isWorkoutFavorite(workoutId: String): Boolean = withContext(Dispatchers.IO) {
+        workoutDao.isFavorite(workoutId)
+    }
+
+    suspend fun setWorkoutFavorite(workoutId: String, favorite: Boolean) = withContext(Dispatchers.IO) {
+        if (favorite) {
+            workoutDao.addFavorite(
+                WorkoutFavoriteEntity(
+                    workoutId = workoutId,
+                    addedAtEpochMillis = System.currentTimeMillis()
+                )
+            )
+        } else {
+            workoutDao.removeFavorite(workoutId)
+        }
+    }
+
+    suspend fun getFavoriteWorkoutIds(): List<String> = withContext(Dispatchers.IO) {
+        workoutDao.getFavoriteWorkoutIds()
     }
 }
 

@@ -10,11 +10,11 @@ import com.beast.app.data.db.UserProfileEntity
 import com.beast.app.data.repo.ProfileRepository
 import com.beast.app.data.repo.ProgramRepository
 import com.beast.app.data.repo.WorkoutRepository
+import com.beast.app.utils.DateFormatting
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
@@ -37,10 +37,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private suspend fun loadState() {
         val locale = Locale.getDefault()
         val today = LocalDate.now()
-        val dateFormatter = DateTimeFormatter.ofPattern("EEEE, d MMMM", locale)
-        val formattedDate = today.format(dateFormatter).replaceFirstChar { ch ->
-            if (ch.isLowerCase()) ch.titlecase(locale) else ch.toString()
-        }
+        val dateFormatter = DateFormatting.dateFormatter(locale, "EEEEdMMMM")
+        val formattedDate = DateFormatting.capitalize(today.format(dateFormatter), locale)
 
         val profile = profileRepository.getProfile()
         val app = getApplication<Application>()
@@ -157,7 +155,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 daysUntilStart == 1 -> "Старт завтра"
                 else -> "Старт сегодня"
             }
-            val dateText = context.startDate.format(DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault()))
+            val dateText = DateFormatting.format(
+                temporal = context.startDate,
+                locale = Locale.getDefault(),
+                skeleton = "MMMMd",
+                capitalizeFirst = true
+            )
             return TodayWorkoutCardState(
                 isVisible = true,
                 title = context.programName,

@@ -29,11 +29,13 @@ import androidx.compose.ui.unit.dp
 import com.beast.app.data.db.DatabaseProvider
 import com.beast.app.data.db.UserProfileEntity
 import com.beast.app.data.repo.ProfileRepository
+import com.beast.app.utils.DateFormatting
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.time.LocalDate
 import java.util.Calendar
+import java.util.Locale
 
 @Composable
 fun ProgramSelectionScreen(onStartProgram: () -> Unit) {
@@ -72,13 +74,22 @@ fun ProgramSelectionScreen(onStartProgram: () -> Unit) {
             )
         }
 
+        val locale = remember(context) {
+            val locales = context.resources.configuration.locales
+            if (!locales.isEmpty) locales[0] else Locale.getDefault()
+        }
+
+        val startDateLabelState = remember(startDate.value, locale) {
+            DateFormatting.format(startDate.value, locale, "yMMMMd", capitalizeFirst = true)
+        }
+
         // Date picker
         Button(onClick = {
             showDatePicker(context) { year, month, day ->
                 startDate.value = LocalDate.of(year, month + 1, day)
             }
         }, modifier = Modifier.padding(top = 16.dp)) {
-            Text(text = String.format(stringResource(id = com.beast.app.R.string.start_date), startDate.value.toString()))
+            Text(text = stringResource(id = com.beast.app.R.string.start_date, startDateLabelState))
         }
 
         // Weight unit toggle (simple)

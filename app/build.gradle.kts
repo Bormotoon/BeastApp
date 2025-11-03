@@ -69,6 +69,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.animation:animation")
+    implementation("com.kizitonwose.calendar:compose:2.5.4")
 
     // Material 3 и адаптивные компоненты
     implementation("androidx.compose.material3:material3")
@@ -98,6 +99,15 @@ dependencies {
     implementation("androidx.core:core-ktx:1.17.0")
     implementation("com.google.android.material:material:1.12.0")
 
+    // Charts
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+
+    // Images
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Biometrics
+    implementation("androidx.biometric:biometric:1.1.0")
+
     // Тесты
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
@@ -114,4 +124,7 @@ dependencies {
 
     // JSON: Gson
     implementation("com.google.code.gson:gson:2.11.0")
+
+    // Preferences
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 }
