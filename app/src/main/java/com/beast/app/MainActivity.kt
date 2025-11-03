@@ -59,14 +59,21 @@ class MainActivity : FragmentActivity() {
         val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
         val onboardingShown = prefs.getBoolean("onboarding_shown", false)
         val programSetupDone = prefs.getBoolean("program_setup_done", false)
+        val initialRoute = when {
+            !onboardingShown -> "onboarding"
+            !programSetupDone -> "program_selection"
+            else -> "home"
+        }
 
         setContent {
             BeastAppTheme {
                 AppNav(
-                    onboardingShown = onboardingShown,
-                    programSetupDone = programSetupDone,
-                    onOnboardingFinished = {
+                    initialRoute = initialRoute,
+                    onMarkOnboardingShown = {
                         prefs.edit().putBoolean("onboarding_shown", true).apply()
+                    },
+                    onMarkProgramSetupDone = {
+                        prefs.edit().putBoolean("program_setup_done", true).apply()
                     }
                 )
             }
@@ -95,16 +102,15 @@ class MainActivity : FragmentActivity() {
 }
 
 @Composable
-private fun AppNav(onboardingShown: Boolean, programSetupDone: Boolean, onOnboardingFinished: () -> Unit) {
+private fun AppNav(
+    initialRoute: String,
+    onMarkOnboardingShown: () -> Unit,
+    onMarkProgramSetupDone: () -> Unit
+) {
     val navController = rememberNavController()
-    val start = when {
-        !onboardingShown -> "onboarding"
-        !programSetupDone -> "program_selection"
-        else -> "home"
-    }
     NavHost(
         navController = navController,
-        startDestination = start,
+        startDestination = initialRoute,
         enterTransition = {
             slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left) + fadeIn()
         },
@@ -120,14 +126,13 @@ private fun AppNav(onboardingShown: Boolean, programSetupDone: Boolean, onOnboar
     ) {
         composable("onboarding") {
             OnboardingScreen(onFinish = {
-                onOnboardingFinished()
-                navController.navigate("program_selection") {
-                    popUpTo("onboarding") { inclusive = true }
-                }
+                onMarkOnboardingShown()
+                navController.navigate("program_selection") { popUpTo("onboarding") { inclusive = true } }
             })
         }
         composable("program_selection") {
             ProgramSelectionScreen(onStartProgram = {
+                onMarkProgramSetupDone()
                 navController.popBackStack("home", inclusive = true)
                 navController.navigate("home") {
                     popUpTo("program_selection") { inclusive = true }
