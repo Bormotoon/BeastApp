@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.core.content.edit
 import java.io.Serializable
 import java.util.Locale
 import kotlin.math.max
@@ -473,7 +474,7 @@ class ActiveWorkoutViewModel(
     private fun persistDraftInternal(state: ActiveWorkoutUiState): Long? {
         val workoutId = state.workoutId ?: return null
         val draft = state.toDraft() ?: return null
-        draftsPrefs.edit().putString(workoutId, gson.toJson(draft)).apply()
+        draftsPrefs.edit { putString(workoutId, gson.toJson(draft)) }
         return draft.timestamp
     }
 
@@ -483,7 +484,7 @@ class ActiveWorkoutViewModel(
     }
 
     private fun clearDraft(workoutId: String) {
-        draftsPrefs.edit().remove(workoutId).apply()
+        draftsPrefs.edit { remove(workoutId) }
         pendingDraft = null
         _uiState.update { it.copy(draftTimestamp = null, showResumeDialog = false) }
     }

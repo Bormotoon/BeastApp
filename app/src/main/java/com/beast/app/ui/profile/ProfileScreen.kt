@@ -54,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -215,7 +216,7 @@ private fun ProfileContent(
     var age by rememberSaveable { mutableStateOf("") }
     var gender by rememberSaveable { mutableStateOf<ProfileGender?>(null) }
     var weightInput by rememberSaveable { mutableStateOf("") }
-    var measurementDateEpochDay by rememberSaveable { mutableStateOf(LocalDate.now().toEpochDay()) }
+    var measurementDateEpochDay by remember { mutableLongStateOf(LocalDate.now().toEpochDay()) }
     var chestInput by rememberSaveable { mutableStateOf("") }
     var waistInput by rememberSaveable { mutableStateOf("") }
     var hipsInput by rememberSaveable { mutableStateOf("") }

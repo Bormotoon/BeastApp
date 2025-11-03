@@ -17,7 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -33,7 +33,7 @@ import com.beast.app.R
 
 @Composable
 fun OnboardingScreen(onFinish: () -> Unit) {
-    var page by remember { mutableStateOf(0) }
+    var page by remember { mutableIntStateOf(0) }
     val pageCount = 3
 
     Column(

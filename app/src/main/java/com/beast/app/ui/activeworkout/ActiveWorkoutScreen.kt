@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.media.RingtoneManager
 import android.net.Uri
+import androidx.core.net.toUri
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -148,7 +149,7 @@ fun ActiveWorkoutRoute(
         onToggleSetCompleted = viewModel::toggleSetCompleted,
         onOpenVideo = { url ->
             runCatching {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                val intent = Intent(Intent.ACTION_VIEW, url.toUri())
                 context.startActivity(intent)
             }
         }
@@ -1236,13 +1237,9 @@ private fun vibrateForRestTimer(context: Context) {
         @Suppress("DEPRECATION")
         val legacyVibrator = context.getSystemService(Vibrator::class.java)
         if (legacyVibrator?.hasVibrator() != true) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val effect = VibrationEffect.createOneShot(500L, VibrationEffect.DEFAULT_AMPLITUDE)
-            legacyVibrator.vibrate(effect)
-        } else {
-            @Suppress("DEPRECATION")
-            legacyVibrator.vibrate(500L)
-        }
+        // minSdk is 26 (O); directly use VibrationEffect without runtime check
+        val effect = VibrationEffect.createOneShot(500L, VibrationEffect.DEFAULT_AMPLITUDE)
+        legacyVibrator.vibrate(effect)
     }
 }
 

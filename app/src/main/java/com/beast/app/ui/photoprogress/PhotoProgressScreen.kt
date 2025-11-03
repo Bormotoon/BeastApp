@@ -60,6 +60,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -128,7 +129,7 @@ private fun PhotoProgressScreen(
     val context = LocalContext.current
 
     var selectedAngle by rememberSaveable { mutableStateOf(PhotoAngle.FRONT) }
-    var selectedDateEpochDay by rememberSaveable { mutableStateOf(LocalDate.now().toEpochDay()) }
+    var selectedDateEpochDay by remember { mutableLongStateOf(LocalDate.now().toEpochDay()) }
     var notes by rememberSaveable { mutableStateOf("") }
     var previewPhoto by remember { mutableStateOf<PhotoItem?>(null) }
     var showSetPasscodeDialog by remember { mutableStateOf(false) }
