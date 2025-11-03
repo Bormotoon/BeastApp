@@ -23,11 +23,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.animation.core.animateDpAsState
+import com.beast.app.R
 
 @Composable
 fun OnboardingScreen(onFinish: () -> Unit) {
@@ -41,9 +43,10 @@ fun OnboardingScreen(onFinish: () -> Unit) {
     ) {
         // Top row with skip aligned to end
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            val skipDescription = stringResource(R.string.cd_skip_onboarding)
             TextButton(
                 onClick = { onFinish() },
-                modifier = Modifier.semantics { contentDescription = "Skip onboarding" }
+                modifier = Modifier.semantics { contentDescription = skipDescription }
             ) {
                 Text("Пропустить")
             }
@@ -72,6 +75,8 @@ fun OnboardingScreen(onFinish: () -> Unit) {
         Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (i in 0 until pageCount) {
                 val isSelected = page == i
+                val currentSlideDescription = stringResource(R.string.cd_onboarding_current_slide, i + 1)
+                val goToSlideDescription = stringResource(R.string.cd_onboarding_go_to_slide, i + 1)
                 val color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray
                 val dotSize = if (isSelected) 12.dp else 8.dp
                 // animated size
@@ -82,7 +87,13 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                     modifier = Modifier
                         .size(36.dp) // touch target
                         .clickable { page = i }
-                        .semantics { contentDescription = if (isSelected) "Текущий слайд ${i + 1}" else "Перейти к слайду ${i + 1}" },
+                        .semantics {
+                            contentDescription = if (isSelected) {
+                                currentSlideDescription
+                            } else {
+                                goToSlideDescription
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Box(
@@ -96,12 +107,16 @@ fun OnboardingScreen(onFinish: () -> Unit) {
 
         // Navigation buttons (bottom)
         Row(modifier = Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            val nextDescription = stringResource(R.string.cd_onboarding_next)
+            val startDescription = stringResource(R.string.cd_onboarding_start)
             Button(
                 onClick = {
                     if (page + 1 < pageCount) page++
                     else onFinish()
                 },
-                modifier = Modifier.semantics { contentDescription = if (page + 1 < pageCount) "Next" else "Start program" }
+                modifier = Modifier.semantics {
+                    contentDescription = if (page + 1 < pageCount) nextDescription else startDescription
+                }
             ) {
                 Text(if (page + 1 < pageCount) "Далее" else "Начать")
             }

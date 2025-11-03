@@ -41,10 +41,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.beast.app.R
 
 @Composable
 fun DashboardRoute(
@@ -353,13 +355,13 @@ private fun DashboardTopBar(
             IconButton(onClick = onOpenProfile) {
                 Icon(
                     imageVector = Icons.Outlined.AccountCircle,
-                    contentDescription = "Открыть профиль"
+                    contentDescription = stringResource(R.string.cd_open_profile)
                 )
             }
             IconButton(onClick = onOpenSettings) {
                 Icon(
                     imageVector = Icons.Outlined.Settings,
-                    contentDescription = "Открыть настройки"
+                    contentDescription = stringResource(R.string.cd_open_settings)
                 )
             }
         }

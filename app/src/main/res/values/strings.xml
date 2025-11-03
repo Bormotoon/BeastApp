@@ -34,4 +34,8 @@
     <string name="cd_select_avatar">Select profile photo</string>
     <string name="cd_progress_photo">Progress photo • %1$s • %2$s</string>
     <string name="cd_skip_onboarding">Skip onboarding</string>
+    <string name="cd_onboarding_current_slide">Current slide %1$d</string>
+    <string name="cd_onboarding_go_to_slide">Go to slide %1$d</string>
+    <string name="cd_onboarding_next">Next slide</string>
+    <string name="cd_onboarding_start">Start program</string>
 </resources>

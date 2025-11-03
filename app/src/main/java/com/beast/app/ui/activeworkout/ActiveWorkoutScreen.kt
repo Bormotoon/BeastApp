@@ -61,6 +61,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,6 +72,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.window.Dialog
 import com.beast.app.model.SetType
+import com.beast.app.R
 
 @Composable
 fun ActiveWorkoutRoute(
@@ -173,7 +175,10 @@ private fun ActiveWorkoutScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Назад")
+                        Icon(
+                            Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = stringResource(R.string.cd_navigate_back)
+                        )
                     }
                 }
             )
@@ -773,7 +778,10 @@ private fun StepField(
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onDecrement) {
-                Icon(Icons.Filled.Remove, contentDescription = "Уменьшить")
+                Icon(
+                    Icons.Filled.Remove,
+                    contentDescription = stringResource(R.string.cd_decrease_value)
+                )
             }
             OutlinedTextField(
                 value = value,
@@ -790,7 +798,10 @@ private fun StepField(
                 }
             )
             IconButton(onClick = onIncrement) {
-                Icon(Icons.Filled.Add, contentDescription = "Увеличить")
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = stringResource(R.string.cd_increase_value)
+                )
             }
         }
     }
