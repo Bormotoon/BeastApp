@@ -64,6 +64,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -71,6 +72,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.viewinterop.AndroidView
+import com.beast.app.R
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.AxisBase
 import com.github.mikephil.charting.components.XAxis
@@ -129,12 +131,18 @@ private fun ProfileScreen(
                 title = { Text("Профиль", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.cd_navigate_back)
+                        )
                     }
                 },
                 actions = {
                     IconButton(onClick = onRefresh) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Обновить")
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = stringResource(R.string.cd_refresh)
+                        )
                     }
                 }
             )
@@ -344,10 +352,19 @@ private fun ProfileHeaderCard(
                     shape = CircleShape
                 ) {
                     if (avatarBitmap != null) {
-                        Image(bitmap = avatarBitmap, contentDescription = "Аватар", modifier = Modifier.fillMaxSize())
+                        Image(
+                            bitmap = avatarBitmap,
+                            contentDescription = stringResource(R.string.cd_profile_photo),
+                            modifier = Modifier.fillMaxSize()
+                        )
                     } else {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Icon(imageVector = Icons.Outlined.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(48.dp))
+                            Icon(
+                                imageVector = Icons.Outlined.Person,
+                                contentDescription = stringResource(R.string.cd_select_avatar),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(48.dp)
+                            )
                         }
                     }
                 }
@@ -371,7 +388,10 @@ private fun ProfileHeaderCard(
                 }
                 if (info.avatarUri != null) {
                     IconButton(onClick = { onUpdateAvatar(null) }) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Удалить фото")
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = stringResource(R.string.cd_remove_avatar)
+                        )
                     }
                 }
             }

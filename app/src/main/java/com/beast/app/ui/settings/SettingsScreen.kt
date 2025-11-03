@@ -47,6 +47,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -63,6 +64,7 @@ import com.beast.app.data.backup.DataExportFormat.JSON
 import com.beast.app.data.db.DatabaseProvider
 import com.beast.app.data.preferences.NotificationPreferencesRepository
 import com.beast.app.data.preferences.TrainingReminderPreferences
+import com.beast.app.R
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -155,7 +157,10 @@ private fun SettingsScreen(
                 title = { Text("Настройки", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.cd_navigate_back)
+                        )
                     }
                 }
             )

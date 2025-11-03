@@ -17,4 +17,21 @@
     <string name="lbs">lbs</string>
 
     <string name="start_program_button">Start program</string>
+
+    <!-- Accessibility content descriptions -->
+    <string name="cd_navigate_back">Go back</string>
+    <string name="cd_refresh">Refresh</string>
+    <string name="cd_close">Close</string>
+    <string name="cd_open_profile">Open profile</string>
+    <string name="cd_open_settings">Open settings</string>
+    <string name="cd_delete_photo">Delete photo</string>
+    <string name="cd_remove_avatar">Remove profile photo</string>
+    <string name="cd_profile_photo">Profile photo</string>
+    <string name="cd_decrease_value">Decrease value</string>
+    <string name="cd_increase_value">Increase value</string>
+    <string name="cd_lock_photos">Lock the photo gallery</string>
+    <string name="cd_unlock_photos">Unlock the photo gallery</string>
+    <string name="cd_select_avatar">Select profile photo</string>
+    <string name="cd_progress_photo">Progress photo • %1$s • %2$s</string>
+    <string name="cd_skip_onboarding">Skip onboarding</string>
 </resources>

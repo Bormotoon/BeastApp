@@ -66,6 +66,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -78,6 +79,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import com.beast.app.utils.DateFormatting
 import java.util.Locale
+import com.beast.app.R
 
 @Composable
 fun PhotoProgressRoute(
@@ -179,21 +181,32 @@ private fun PhotoProgressScreen(
                         onLock()
                         onBack()
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.cd_navigate_back)
+                        )
                     }
                 },
                 actions = {
                     IconButton(onClick = onRefresh) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Обновить")
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = stringResource(R.string.cd_refresh)
+                        )
                     }
                     IconButton(onClick = {
                         if (state.privacyEnabled && !state.locked) {
                             onLock()
                         }
                     }) {
+                        val lockDescription = if (state.locked) {
+                            stringResource(R.string.cd_unlock_photos)
+                        } else {
+                            stringResource(R.string.cd_lock_photos)
+                        }
                         Icon(
                             imageVector = if (state.locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
-                            contentDescription = null
+                            contentDescription = lockDescription
                         )
                     }
                 }
@@ -552,7 +565,10 @@ private fun PhotoThumbnail(
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
         ) {
             IconButton(onClick = { onDelete(photo.id) }, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Filled.Delete, contentDescription = "Удалить")
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = stringResource(R.string.cd_delete_photo)
+                )
             }
         }
         Surface(

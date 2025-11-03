@@ -17,4 +17,21 @@
     <string name="lbs">Фунты</string>
 
     <string name="start_program_button">Начать программу</string>
+
+    <!-- Описания для доступности -->
+    <string name="cd_navigate_back">Назад</string>
+    <string name="cd_refresh">Обновить</string>
+    <string name="cd_close">Закрыть</string>
+    <string name="cd_open_profile">Открыть профиль</string>
+    <string name="cd_open_settings">Открыть настройки</string>
+    <string name="cd_delete_photo">Удалить фото</string>
+    <string name="cd_remove_avatar">Удалить фото профиля</string>
+    <string name="cd_profile_photo">Фото профиля</string>
+    <string name="cd_decrease_value">Уменьшить значение</string>
+    <string name="cd_increase_value">Увеличить значение</string>
+    <string name="cd_lock_photos">Заблокировать доступ к фото</string>
+    <string name="cd_unlock_photos">Разблокировать доступ к фото</string>
+    <string name="cd_select_avatar">Выбрать фото профиля</string>
+    <string name="cd_progress_photo">Фото прогресса • %1$s • %2$s</string>
+    <string name="cd_skip_onboarding">Пропустить онбординг</string>
 </resources>

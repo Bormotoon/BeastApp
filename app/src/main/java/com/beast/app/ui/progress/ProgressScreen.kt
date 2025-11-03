@@ -54,11 +54,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.beast.app.R
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.charts.HorizontalBarChart
@@ -120,13 +122,19 @@ private fun ProgressScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.cd_navigate_back)
+                        )
                     }
                 },
                 actions = {
                     TextButton(onClick = onOpenHistory) { Text("История") }
                     IconButton(onClick = onRefresh) {
-                        Icon(Icons.Outlined.Refresh, contentDescription = "Обновить")
+                        Icon(
+                            Icons.Outlined.Refresh,
+                            contentDescription = stringResource(R.string.cd_refresh)
+                        )
                     }
                 }
             )

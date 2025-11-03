@@ -41,9 +41,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.beast.app.R
 import com.beast.app.ui.activeworkout.CompletedExerciseResult
 import com.beast.app.ui.activeworkout.CompletedSetResult
 
@@ -96,7 +98,10 @@ private fun WorkoutCompletionScreen(
                 title = { Text("Тренировка завершена!", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onBackToHome) {
-                        Icon(Icons.Filled.Close, contentDescription = "Закрыть")
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = stringResource(R.string.cd_close)
+                        )
                     }
                 }
             )
