@@ -5,12 +5,14 @@ import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.google.gson.Gson
 import com.beast.app.data.db.DatabaseProvider
 import com.beast.app.data.db.SetLogEntity
 import com.beast.app.data.repo.ProfileRepository
 import com.beast.app.data.repo.ProgramRepository
 import com.beast.app.data.repo.WorkoutRepository
 import com.beast.app.model.SetType
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.Serializable
 import java.util.Locale
 import kotlin.math.max
@@ -47,12 +50,16 @@ class ActiveWorkoutViewModel(
     private val profileRepository = ProfileRepository(database)
     private val programRepository = ProgramRepository(database)
     private val workoutRepository = WorkoutRepository(database)
+    private val draftsPrefs = application.getSharedPreferences("workout_drafts", Context.MODE_PRIVATE)
+    private val gson = Gson()
 
     private val _uiState = MutableStateFlow(ActiveWorkoutUiState(isLoading = true))
     val uiState: StateFlow<ActiveWorkoutUiState> = _uiState
 
     private var workoutTimerJob: Job? = null
     private var restTimerJob: Job? = null
+    private var autosaveJob: Job? = null
+    private var pendingDraft: WorkoutDraft? = null
 
     init {
         viewModelScope.launch { loadData() }
@@ -61,6 +68,7 @@ class ActiveWorkoutViewModel(
 
     fun toggleTimer() {
         _uiState.update { it.copy(isTimerRunning = !it.isTimerRunning) }
+        scheduleAutosave()
     }
 
     fun requestFinish() {
@@ -74,6 +82,12 @@ class ActiveWorkoutViewModel(
     fun confirmFinish() {
         workoutTimerJob?.cancel()
         restTimerJob?.cancel()
+
+        val workoutKey = _uiState.value.workoutId
+        if (workoutKey != null) {
+            clearDraft(workoutKey)
+        }
+        autosaveJob?.cancel()
 
         val summary = buildCompletionSummary(_uiState.value)
 
@@ -92,6 +106,56 @@ class ActiveWorkoutViewModel(
         _uiState.update { it.copy(completedResult = null) }
     }
 
+    fun requestExit() {
+        if (_uiState.value.isCompleted) return
+        _uiState.update { it.copy(showExitDialog = true) }
+    }
+
+    fun cancelExit() {
+        _uiState.update { it.copy(showExitDialog = false) }
+    }
+
+    fun continueLater() {
+        persistDraftNow()
+        _uiState.update { it.copy(showExitDialog = false) }
+        postExitAction()
+    }
+
+    fun discardAndExit() {
+        val key = _uiState.value.workoutId
+        if (key != null) {
+            clearDraft(key)
+        }
+        autosaveJob?.cancel()
+        _uiState.update { it.copy(showExitDialog = false) }
+        postExitAction()
+    }
+
+    fun finishFromExit() {
+        _uiState.update { it.copy(showExitDialog = false) }
+        confirmFinish()
+    }
+
+    fun consumeExitAction() {
+        _uiState.update { it.copy(exitAction = null) }
+    }
+
+    fun resumeDraft() {
+        val draft = pendingDraft ?: return
+        applyDraft(draft)
+        pendingDraft = null
+        scheduleAutosave()
+    }
+
+    fun discardDraftAndRestart() {
+        val key = _uiState.value.workoutId
+        if (key != null) {
+            clearDraft(key)
+        }
+        pendingDraft = null
+        _uiState.update { it.copy(showResumeDialog = false, draftTimestamp = null) }
+    }
+
     fun nextExercise() {
         _uiState.update { state ->
             val order = state.visibleExerciseIndices
@@ -104,6 +168,7 @@ class ActiveWorkoutViewModel(
                 currentExerciseId = state.exercises.getOrNull(newIndex)?.id
             )
         }
+        scheduleAutosave()
     }
 
     fun previousExercise() {
@@ -118,6 +183,7 @@ class ActiveWorkoutViewModel(
                 currentExerciseId = state.exercises.getOrNull(newIndex)?.id
             )
         }
+        scheduleAutosave()
     }
 
     fun startRestTimer(totalSeconds: Int = DEFAULT_REST_SECONDS, showDialog: Boolean = true) {
@@ -137,6 +203,7 @@ class ActiveWorkoutViewModel(
                 )
             )
         }
+        scheduleAutosave()
         restTimerJob = viewModelScope.launch {
             while (isActive) {
                 delay(1_000)
@@ -179,11 +246,13 @@ class ActiveWorkoutViewModel(
                 )
             )
         }
+        scheduleAutosave()
     }
 
     fun skipRest() {
         restTimerJob?.cancel()
         _uiState.update { it.copy(restTimer = null) }
+        scheduleAutosave()
     }
 
     fun hideRestDialog() {
@@ -192,6 +261,7 @@ class ActiveWorkoutViewModel(
             if (!timer.showDialog) return@update state
             state.copy(restTimer = timer.copy(showDialog = false))
         }
+        scheduleAutosave()
     }
 
     fun showRestDialog() {
@@ -200,6 +270,7 @@ class ActiveWorkoutViewModel(
             if (timer.showDialog) return@update state
             state.copy(restTimer = timer.copy(showDialog = true))
         }
+        scheduleAutosave()
     }
 
     fun acknowledgeRestTimerAlert() {
@@ -215,6 +286,7 @@ class ActiveWorkoutViewModel(
         _uiState.updateSet(exerciseId, setIndex) { set ->
             set.copy(weightInput = sanitized)
         }
+        scheduleAutosave()
     }
 
     fun adjustWeight(exerciseId: String, setIndex: Int, delta: Double) {
@@ -232,6 +304,7 @@ class ActiveWorkoutViewModel(
             val updated = max(0.0, base + appliedDelta)
             set.copy(weightInput = formatWeight(updated))
         }
+        scheduleAutosave()
     }
 
     fun updateRepsInput(exerciseId: String, setIndex: Int, rawValue: String) {
@@ -239,6 +312,7 @@ class ActiveWorkoutViewModel(
         _uiState.updateSet(exerciseId, setIndex) { set ->
             set.copy(repsInput = sanitized)
         }
+        scheduleAutosave()
     }
 
     fun adjustReps(exerciseId: String, setIndex: Int, delta: Int) {
@@ -255,6 +329,7 @@ class ActiveWorkoutViewModel(
             val updated = max(0, base + applied)
             set.copy(repsInput = updated.toString())
         }
+        scheduleAutosave()
     }
 
     fun toggleSetCompleted(exerciseId: String, setIndex: Int) {
@@ -295,6 +370,7 @@ class ActiveWorkoutViewModel(
             }
             maybeAutoAdvanceSpecialSet(_uiState.value, exerciseId)
         }
+        scheduleAutosave()
     }
 
     private fun computeRestTrigger(
@@ -361,6 +437,98 @@ class ActiveWorkoutViewModel(
         val position = state.visibleExerciseIndices.indexOf(leaderIndex)
         if (position == -1 || position >= state.visibleExerciseIndices.lastIndex) return
         nextExercise()
+    }
+
+    private fun postExitAction() {
+        _uiState.update { it.copy(exitAction = ExitAction(ExitActionType.NavigateBack)) }
+    }
+
+    private fun persistDraftNow() {
+        val snapshot = _uiState.value
+        val workoutId = snapshot.workoutId ?: return
+        autosaveJob?.cancel()
+        viewModelScope.launch {
+            val timestamp = withContext(Dispatchers.IO) { persistDraftInternal(snapshot) }
+            if (timestamp != null) {
+                _uiState.update { it.copy(draftTimestamp = timestamp) }
+            }
+        }
+    }
+
+    private fun scheduleAutosave() {
+        val snapshot = _uiState.value
+        if (snapshot.workoutId == null || snapshot.isCompleted) return
+        autosaveJob?.cancel()
+        autosaveJob = viewModelScope.launch {
+            delay(400)
+            val state = _uiState.value
+            if (state.workoutId == null || state.isCompleted) return@launch
+            val timestamp = withContext(Dispatchers.IO) { persistDraftInternal(state) }
+            if (timestamp != null) {
+                _uiState.update { it.copy(draftTimestamp = timestamp) }
+            }
+        }
+    }
+
+    private fun persistDraftInternal(state: ActiveWorkoutUiState): Long? {
+        val workoutId = state.workoutId ?: return null
+        val draft = state.toDraft() ?: return null
+        draftsPrefs.edit().putString(workoutId, gson.toJson(draft)).apply()
+        return draft.timestamp
+    }
+
+    private fun loadDraft(workoutId: String): WorkoutDraft? {
+        val raw = draftsPrefs.getString(workoutId, null) ?: return null
+        return runCatching { gson.fromJson(raw, WorkoutDraft::class.java) }.getOrNull()
+    }
+
+    private fun clearDraft(workoutId: String) {
+        draftsPrefs.edit().remove(workoutId).apply()
+        pendingDraft = null
+        _uiState.update { it.copy(draftTimestamp = null, showResumeDialog = false) }
+    }
+
+    private fun applyDraft(draft: WorkoutDraft) {
+        _uiState.update { current ->
+            if (current.workoutId != draft.workoutId) return@update current.copy(showResumeDialog = false)
+            val updatedExercises = current.exercises.map { exercise ->
+                val draftExercise = draft.exercises.firstOrNull { it.exerciseId == exercise.id }
+                    ?: return@map exercise
+                val updatedSets = exercise.sets.map { set ->
+                    val draftSet = draftExercise.sets.firstOrNull { it.setNumber == set.setNumber }
+                        ?: return@map set
+                    recalcRecord(
+                        set.copy(
+                            weightInput = draftSet.weightInput,
+                            repsInput = draftSet.repsInput,
+                            completed = draftSet.completed,
+                            isNewRecord = draftSet.isNewRecord
+                        )
+                    )
+                }
+                exercise.copy(sets = updatedSets)
+            }
+            val clampedIndex = draft.currentExerciseIndex.coerceIn(0, (updatedExercises.size - 1).coerceAtLeast(0))
+            val rest = draft.restTimer?.let {
+                RestTimerState(
+                    totalSeconds = it.totalSeconds,
+                    remainingSeconds = it.remainingSeconds,
+                    isRunning = it.isRunning,
+                    showDialog = it.showDialog,
+                    shouldNotify = it.shouldNotify
+                )
+            }
+            current.copy(
+                exercises = updatedExercises,
+                elapsedSeconds = draft.elapsedSeconds,
+                isTimerRunning = draft.isTimerRunning,
+                currentExerciseIndex = clampedIndex,
+                currentExerciseId = updatedExercises.getOrNull(clampedIndex)?.id,
+                restTimer = rest,
+                showResumeDialog = false,
+                draftTimestamp = draft.timestamp
+            )
+        }
     }
 
     private fun MutableStateFlow<ActiveWorkoutUiState>.updateSet(
@@ -532,7 +700,7 @@ class ActiveWorkoutViewModel(
         val initialExerciseIndex = displayIndices.firstOrNull() ?: 0
         val currentExerciseId = exercises.getOrNull(initialExerciseIndex)?.id
 
-        _uiState.value = ActiveWorkoutUiState(
+        var nextState = ActiveWorkoutUiState(
             isLoading = false,
             workoutId = workoutData.workout.id,
             workoutName = workoutData.workout.name,
@@ -547,6 +715,13 @@ class ActiveWorkoutViewModel(
             currentExerciseId = currentExerciseId,
             isTimerRunning = true
         )
+
+        loadDraft(workoutData.workout.id)?.let { draft ->
+            pendingDraft = draft
+            nextState = nextState.copy(showResumeDialog = true, draftTimestamp = draft.timestamp)
+        }
+
+        _uiState.value = nextState
     }
 
     private fun restSuggestionFor(type: SetType): Int = when (type) {
@@ -726,8 +901,12 @@ data class ActiveWorkoutUiState(
     val isTimerRunning: Boolean = true,
     val restTimer: RestTimerState? = null,
     val showFinishDialog: Boolean = false,
+    val showExitDialog: Boolean = false,
+    val showResumeDialog: Boolean = false,
     val isCompleted: Boolean = false,
-    val completedResult: ActiveWorkoutResult? = null
+    val draftTimestamp: Long? = null,
+    val completedResult: ActiveWorkoutResult? = null,
+    val exitAction: ExitAction? = null
 )
 
 data class ActiveExerciseState(
@@ -803,3 +982,75 @@ data class CompletedSetResult(
     val volume: Double?,
     val isRecord: Boolean
 ) : Serializable
+
+data class ExitAction(val type: ExitActionType)
+
+enum class ExitActionType { NavigateBack }
+
+data class WorkoutDraft(
+    val workoutId: String,
+    val timestamp: Long,
+    val elapsedSeconds: Int,
+    val isTimerRunning: Boolean,
+    val currentExerciseIndex: Int,
+    val restTimer: RestTimerDraft?,
+    val exercises: List<WorkoutDraftExercise>
+)
+
+data class WorkoutDraftExercise(
+    val exerciseId: String,
+    val sets: List<WorkoutDraftSet>
+)
+
+data class WorkoutDraftSet(
+    val setNumber: Int,
+    val weightInput: String,
+    val repsInput: String,
+    val completed: Boolean,
+    val isNewRecord: Boolean
+)
+
+data class RestTimerDraft(
+    val totalSeconds: Int,
+    val remainingSeconds: Int,
+    val isRunning: Boolean,
+    val showDialog: Boolean,
+    val shouldNotify: Boolean
+)
+
+private fun ActiveWorkoutUiState.toDraft(): WorkoutDraft? {
+    val workoutId = workoutId ?: return null
+    if (exercises.isEmpty()) return null
+    val exercisesDraft = exercises.map { exercise ->
+        WorkoutDraftExercise(
+            exerciseId = exercise.id,
+            sets = exercise.sets.map { set ->
+                WorkoutDraftSet(
+                    setNumber = set.setNumber,
+                    weightInput = set.weightInput,
+                    repsInput = set.repsInput,
+                    completed = set.completed,
+                    isNewRecord = set.isNewRecord
+                )
+            }
+        )
+    }
+    val restDraft = restTimer?.let {
+        RestTimerDraft(
+            totalSeconds = it.totalSeconds,
+            remainingSeconds = it.remainingSeconds,
+            isRunning = it.isRunning,
+            showDialog = it.showDialog,
+            shouldNotify = it.shouldNotify
+        )
+    }
+    return WorkoutDraft(
+        workoutId = workoutId,
+        timestamp = System.currentTimeMillis(),
+        elapsedSeconds = elapsedSeconds,
+        isTimerRunning = isTimerRunning,
+        currentExerciseIndex = currentExerciseIndex,
+        restTimer = restDraft,
+        exercises = exercisesDraft
+    )
+}

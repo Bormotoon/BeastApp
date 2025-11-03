@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -56,6 +57,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -73,6 +75,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.window.Dialog
 import com.beast.app.model.SetType
 import com.beast.app.R
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun ActiveWorkoutRoute(
@@ -97,9 +103,26 @@ fun ActiveWorkoutRoute(
         }
     }
 
+    LaunchedEffect(state.exitAction) {
+        val action = state.exitAction ?: return@LaunchedEffect
+        when (action.type) {
+            ExitActionType.NavigateBack -> onBack()
+        }
+        viewModel.consumeExitAction()
+    }
+
+    BackHandler(enabled = !state.isCompleted) {
+        when {
+            state.showFinishDialog -> viewModel.cancelFinish()
+            state.showExitDialog -> viewModel.cancelExit()
+            state.showResumeDialog -> viewModel.discardDraftAndRestart()
+            else -> viewModel.requestExit()
+        }
+    }
+
     ActiveWorkoutScreen(
         state = state,
-        onBack = onBack,
+        onBackRequest = viewModel::requestExit,
         onToggleTimer = viewModel::toggleTimer,
         onNextExercise = viewModel::nextExercise,
         onPreviousExercise = viewModel::previousExercise,
@@ -112,6 +135,12 @@ fun ActiveWorkoutRoute(
         onFinishRequest = viewModel::requestFinish,
         onCancelFinish = viewModel::cancelFinish,
         onConfirmFinish = viewModel::confirmFinish,
+        onContinueLater = viewModel::continueLater,
+        onDiscardAndExit = viewModel::discardAndExit,
+        onFinishFromExit = viewModel::finishFromExit,
+        onDismissExit = viewModel::cancelExit,
+        onResumeDraft = viewModel::resumeDraft,
+        onDiscardDraft = viewModel::discardDraftAndRestart,
         onWeightChange = viewModel::updateWeightInput,
         onAdjustWeight = viewModel::adjustWeight,
         onRepsChange = viewModel::updateRepsInput,
@@ -129,7 +158,7 @@ fun ActiveWorkoutRoute(
 @Composable
 private fun ActiveWorkoutScreen(
     state: ActiveWorkoutUiState,
-    onBack: () -> Unit,
+    onBackRequest: () -> Unit,
     onToggleTimer: () -> Unit,
     onNextExercise: () -> Unit,
     onPreviousExercise: () -> Unit,
@@ -142,6 +171,12 @@ private fun ActiveWorkoutScreen(
     onFinishRequest: () -> Unit,
     onCancelFinish: () -> Unit,
     onConfirmFinish: () -> Unit,
+    onContinueLater: () -> Unit,
+    onDiscardAndExit: () -> Unit,
+    onFinishFromExit: () -> Unit,
+    onDismissExit: () -> Unit,
+    onResumeDraft: () -> Unit,
+    onDiscardDraft: () -> Unit,
     onWeightChange: (String, Int, String) -> Unit,
     onAdjustWeight: (String, Int, Double) -> Unit,
     onRepsChange: (String, Int, String) -> Unit,
@@ -174,7 +209,7 @@ private fun ActiveWorkoutScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = onBackRequest) {
                         Icon(
                             Icons.AutoMirrored.Outlined.ArrowBack,
                             contentDescription = stringResource(R.string.cd_navigate_back)
@@ -290,7 +325,7 @@ private fun ActiveWorkoutScreen(
             onDismissRequest = onCancelFinish,
             title = { Text("Завершить тренировку?") },
             text = {
-                Text("Подтвердите завершение. Данные пока не сохраняются — функция в разработке.")
+                Text("Подтвердите завершение тренировки. Все введённые данные будут сохранены в журнал.")
             },
             confirmButton = {
                 Button(onClick = onConfirmFinish) {
@@ -300,6 +335,72 @@ private fun ActiveWorkoutScreen(
             dismissButton = {
                 OutlinedButton(onClick = onCancelFinish) {
                     Text("Отмена")
+                }
+            }
+        )
+    }
+
+    if (state.showExitDialog) {
+        Dialog(onDismissRequest = onDismissExit) {
+            Surface(shape = MaterialTheme.shapes.large) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    Text(text = "Тренировка на паузе", style = MaterialTheme.typography.headlineSmall)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Выберите, как поступить с текущей тренировкой. Прогресс сохраняется автоматически.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        state.draftTimestamp?.let { timestamp ->
+                            Text(
+                                text = "Последнее сохранение: ${formatDraftTimestamp(timestamp)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(onClick = onContinueLater, modifier = Modifier.fillMaxWidth()) {
+                            Text("Продолжить позже")
+                        }
+                        OutlinedButton(onClick = onFinishFromExit, modifier = Modifier.fillMaxWidth()) {
+                            Text("Завершить досрочно")
+                        }
+                        TextButton(onClick = onDiscardAndExit, modifier = Modifier.fillMaxWidth()) {
+                            Text("Отменить без сохранения")
+                        }
+                    }
+                    TextButton(onClick = onDismissExit, modifier = Modifier.align(Alignment.End)) {
+                        Text("Остаться")
+                    }
+                }
+            }
+        }
+    }
+
+    if (state.showResumeDialog) {
+        AlertDialog(
+            onDismissRequest = onDiscardDraft,
+            title = { Text("Продолжить незавершённую тренировку?") },
+            text = {
+                Text(
+                    text = "Найден сохранённый прогресс для этой тренировки. Хотите восстановить данные и продолжить?",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(onClick = onResumeDraft) {
+                    Text("Продолжить")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = onDiscardDraft) {
+                    Text("Начать заново")
                 }
             }
         )
@@ -1085,6 +1186,14 @@ private fun formatTime(totalSeconds: Int): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return "%d:%02d".format(minutes, seconds)
+}
+
+private fun formatDraftTimestamp(timestamp: Long): String {
+    val formatter = DateTimeFormatter.ofPattern("d MMM HH:mm", Locale.getDefault())
+    return Instant.ofEpochMilli(timestamp)
+        .atZone(ZoneId.systemDefault())
+        .toLocalDateTime()
+        .format(formatter)
 }
 
 private fun specialSetHint(type: SetType, restSeconds: Int?): String? = when (type) {

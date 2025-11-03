@@ -61,17 +61,27 @@ object DatabaseProvider {
         }
     }
 
+    internal val ALL_MIGRATIONS = arrayOf(
+        MIGRATION_1_2,
+        MIGRATION_2_3,
+        MIGRATION_3_4,
+        MIGRATION_4_5,
+        MIGRATION_5_6
+    )
+
     fun get(context: Context): BeastDatabase {
         return INSTANCE ?: synchronized(this) {
-            val instance = Room.databaseBuilder(
-                context.applicationContext,
-                BeastDatabase::class.java,
-                "beast.db"
-            )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
-                .build()
+            val instance = buildDatabase(context.applicationContext)
             INSTANCE = instance
             instance
         }
+    }
+
+    internal fun buildDatabase(context: Context, name: String = "beast.db"): BeastDatabase {
+        return Room.databaseBuilder(
+            context,
+            BeastDatabase::class.java,
+            name
+        ).addMigrations(*ALL_MIGRATIONS).build()
     }
 }

@@ -25,6 +25,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.beast.app.data.db.DatabaseProvider
 import com.beast.app.data.repo.ProgramRepository
+import com.beast.app.diagnostics.OfflineStrictMode
 import com.beast.app.domain.usecase.ImportProgramUseCase
 import com.beast.app.ui.activeworkout.ActiveWorkoutResult
 import com.beast.app.ui.activeworkout.ActiveWorkoutRoute
@@ -49,6 +50,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        OfflineStrictMode.enforce(this)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT)
