@@ -41,6 +41,8 @@ class ActiveWorkoutViewModel(
         private val DEFAULT_PROGRESSIVE_PATTERN = listOf("15", "12", "8", "8", "12", "15")
         private const val PREF_WORKOUT_TIMER_ENABLED = "pref_workout_timer_enabled"
         private const val PREF_REST_TIMER_ENABLED = "pref_rest_timer_enabled"
+        private const val PREF_PAUSE_DIALOG_ENABLED = "pref_pause_dialog_enabled"
+        private const val PREF_RESUME_PROMPT_ENABLED = "pref_resume_prompt_enabled"
     }
 
     private data class RestTrigger(val seconds: Int, val showDialog: Boolean)
@@ -116,6 +118,27 @@ class ActiveWorkoutViewModel(
         }
     }
 
+    fun setPauseDialogEnabled(enabled: Boolean) {
+        appPrefs.edit { putBoolean(PREF_PAUSE_DIALOG_ENABLED, enabled) }
+        _uiState.update { state ->
+            state.copy(
+                isPauseDialogEnabled = enabled,
+                showExitDialog = if (enabled) state.showExitDialog else false
+            )
+        }
+    }
+
+    fun setResumePromptEnabled(enabled: Boolean) {
+        appPrefs.edit { putBoolean(PREF_RESUME_PROMPT_ENABLED, enabled) }
+        _uiState.update { state ->
+            val shouldShowPrompt = enabled && pendingDraft != null
+            state.copy(
+                isResumePromptEnabled = enabled,
+                showResumeDialog = shouldShowPrompt
+            )
+        }
+    }
+
     fun confirmFinish() {
         workoutTimerJob?.cancel()
         restTimerJob?.cancel()
@@ -144,8 +167,13 @@ class ActiveWorkoutViewModel(
     }
 
     fun requestExit() {
-        if (_uiState.value.isCompleted) return
-        _uiState.update { it.copy(showExitDialog = true) }
+        val snapshot = _uiState.value
+        if (snapshot.isCompleted) return
+        if (snapshot.isPauseDialogEnabled) {
+            _uiState.update { it.copy(showExitDialog = true) }
+        } else {
+            exitAfterSavingDraft()
+        }
     }
 
     fun cancelExit() {
@@ -153,9 +181,7 @@ class ActiveWorkoutViewModel(
     }
 
     fun continueLater() {
-        persistDraftNow()
-        _uiState.update { it.copy(showExitDialog = false) }
-        postExitAction()
+        exitAfterSavingDraft()
     }
 
     fun discardAndExit() {
@@ -486,16 +512,22 @@ class ActiveWorkoutViewModel(
         _uiState.update { it.copy(exitAction = ExitAction(ExitActionType.NavigateBack)) }
     }
 
-    private fun persistDraftNow() {
+    private fun persistDraftNow(): Job? {
         val snapshot = _uiState.value
-        val workoutId = snapshot.workoutId ?: return
+        val workoutId = snapshot.workoutId ?: return null
         autosaveJob?.cancel()
-        viewModelScope.launch {
+        return viewModelScope.launch {
             val timestamp = withContext(Dispatchers.IO) { persistDraftInternal(snapshot) }
             if (timestamp != null) {
                 _uiState.update { it.copy(draftTimestamp = timestamp) }
             }
         }
+    }
+
+    private fun exitAfterSavingDraft() {
+        val job = persistDraftNow()
+        _uiState.update { it.copy(showExitDialog = false) }
+        job?.invokeOnCompletion { postExitAction() } ?: postExitAction()
     }
 
     private fun scheduleAutosave() {
@@ -532,46 +564,48 @@ class ActiveWorkoutViewModel(
     }
 
     private fun applyDraft(draft: WorkoutDraft) {
-        _uiState.update { current ->
-            if (current.workoutId != draft.workoutId) return@update current.copy(showResumeDialog = false)
-            val updatedExercises = current.exercises.map { exercise ->
-                val draftExercise = draft.exercises.firstOrNull { it.exerciseId == exercise.id }
-                    ?: return@map exercise
-                val updatedSets = exercise.sets.map { set ->
-                    val draftSet = draftExercise.sets.firstOrNull { it.setNumber == set.setNumber }
-                        ?: return@map set
-                    recalcRecord(
-                        set.copy(
-                            weightInput = draftSet.weightInput,
-                            repsInput = draftSet.repsInput,
-                            completed = draftSet.completed,
-                            isNewRecord = draftSet.isNewRecord
-                        )
+        _uiState.update { current -> applyDraftToState(current, draft) }
+    }
+
+    private fun applyDraftToState(current: ActiveWorkoutUiState, draft: WorkoutDraft): ActiveWorkoutUiState {
+        if (current.workoutId != draft.workoutId) return current.copy(showResumeDialog = false)
+        val updatedExercises = current.exercises.map { exercise ->
+            val draftExercise = draft.exercises.firstOrNull { it.exerciseId == exercise.id }
+                ?: return@map exercise
+            val updatedSets = exercise.sets.map { set ->
+                val draftSet = draftExercise.sets.firstOrNull { it.setNumber == set.setNumber }
+                    ?: return@map set
+                recalcRecord(
+                    set.copy(
+                        weightInput = draftSet.weightInput,
+                        repsInput = draftSet.repsInput,
+                        completed = draftSet.completed,
+                        isNewRecord = draftSet.isNewRecord
                     )
-                }
-                exercise.copy(sets = updatedSets)
-            }
-            val clampedIndex = draft.currentExerciseIndex.coerceIn(0, (updatedExercises.size - 1).coerceAtLeast(0))
-            val rest = draft.restTimer?.let {
-                RestTimerState(
-                    totalSeconds = it.totalSeconds,
-                    remainingSeconds = it.remainingSeconds,
-                    isRunning = it.isRunning,
-                    showDialog = it.showDialog,
-                    shouldNotify = it.shouldNotify
                 )
             }
-            current.copy(
-                exercises = updatedExercises,
-                elapsedSeconds = draft.elapsedSeconds,
-                isTimerRunning = if (current.isWorkoutTimerEnabled) draft.isTimerRunning else false,
-                currentExerciseIndex = clampedIndex,
-                currentExerciseId = updatedExercises.getOrNull(clampedIndex)?.id,
-                restTimer = if (current.isRestTimerEnabled) rest else null,
-                showResumeDialog = false,
-                draftTimestamp = draft.timestamp
+            exercise.copy(sets = updatedSets)
+        }
+        val clampedIndex = draft.currentExerciseIndex.coerceIn(0, (updatedExercises.size - 1).coerceAtLeast(0))
+        val rest = draft.restTimer?.let {
+            RestTimerState(
+                totalSeconds = it.totalSeconds,
+                remainingSeconds = it.remainingSeconds,
+                isRunning = it.isRunning,
+                showDialog = it.showDialog,
+                shouldNotify = it.shouldNotify
             )
         }
+        return current.copy(
+            exercises = updatedExercises,
+            elapsedSeconds = draft.elapsedSeconds,
+            isTimerRunning = if (current.isWorkoutTimerEnabled) draft.isTimerRunning else false,
+            currentExerciseIndex = clampedIndex,
+            currentExerciseId = updatedExercises.getOrNull(clampedIndex)?.id,
+            restTimer = if (current.isRestTimerEnabled) rest else null,
+            showResumeDialog = false,
+            draftTimestamp = draft.timestamp
+        )
     }
 
     private fun MutableStateFlow<ActiveWorkoutUiState>.updateSet(
@@ -654,6 +688,8 @@ class ActiveWorkoutViewModel(
 
         val isWorkoutTimerEnabled = appPrefs.getBoolean(PREF_WORKOUT_TIMER_ENABLED, false)
         val isRestTimerEnabled = appPrefs.getBoolean(PREF_REST_TIMER_ENABLED, false)
+        val isPauseDialogEnabled = appPrefs.getBoolean(PREF_PAUSE_DIALOG_ENABLED, false)
+        val isResumePromptEnabled = appPrefs.getBoolean(PREF_RESUME_PROMPT_ENABLED, false)
 
         val latestLog = workoutRepository.getLogsForWorkout(workoutId).firstOrNull()
         val setLogsByExercise: Map<String, List<SetLogEntity>> = if (latestLog != null) {
@@ -761,15 +797,25 @@ class ActiveWorkoutViewModel(
             currentExerciseId = currentExerciseId,
             isWorkoutTimerEnabled = isWorkoutTimerEnabled,
             isRestTimerEnabled = isRestTimerEnabled,
+            isPauseDialogEnabled = isPauseDialogEnabled,
+            isResumePromptEnabled = isResumePromptEnabled,
             isTimerRunning = false
         )
 
         loadDraft(workoutData.workout.id)?.let { draft ->
             pendingDraft = draft
-            nextState = nextState.copy(showResumeDialog = true, draftTimestamp = draft.timestamp)
+            nextState = if (isResumePromptEnabled) {
+                nextState.copy(showResumeDialog = true, draftTimestamp = draft.timestamp)
+            } else {
+                pendingDraft = null
+                applyDraftToState(nextState, draft)
+            }
         }
 
         _uiState.value = nextState
+        if (!isResumePromptEnabled) {
+            scheduleAutosave()
+        }
     }
 
     private fun restSuggestionFor(type: SetType): Int = when (type) {
@@ -948,6 +994,8 @@ data class ActiveWorkoutUiState(
     val elapsedSeconds: Int = 0,
     val isWorkoutTimerEnabled: Boolean = false,
     val isRestTimerEnabled: Boolean = false,
+    val isPauseDialogEnabled: Boolean = false,
+    val isResumePromptEnabled: Boolean = false,
     val isTimerRunning: Boolean = false,
     val restTimer: RestTimerState? = null,
     val showFinishDialog: Boolean = false,

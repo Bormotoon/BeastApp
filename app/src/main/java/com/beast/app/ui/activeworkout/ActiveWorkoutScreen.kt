@@ -117,7 +117,7 @@ fun ActiveWorkoutRoute(
     BackHandler(enabled = !state.isCompleted) {
         when {
             state.showFinishDialog -> viewModel.cancelFinish()
-            state.showExitDialog -> viewModel.cancelExit()
+            state.isPauseDialogEnabled && state.showExitDialog -> viewModel.cancelExit()
             state.showResumeDialog -> viewModel.discardDraftAndRestart()
             else -> viewModel.requestExit()
         }
@@ -148,6 +148,8 @@ fun ActiveWorkoutRoute(
         onDismissOptions = viewModel::dismissOptions,
         onWorkoutTimerEnabledChange = viewModel::setWorkoutTimerEnabled,
         onRestTimerEnabledChange = viewModel::setRestTimerEnabled,
+        onPauseDialogEnabledChange = viewModel::setPauseDialogEnabled,
+        onResumePromptEnabledChange = viewModel::setResumePromptEnabled,
         onWeightChange = viewModel::updateWeightInput,
         onAdjustWeight = viewModel::adjustWeight,
         onRepsChange = viewModel::updateRepsInput,
@@ -188,6 +190,8 @@ private fun ActiveWorkoutScreen(
     onDismissOptions: () -> Unit,
     onWorkoutTimerEnabledChange: (Boolean) -> Unit,
     onRestTimerEnabledChange: (Boolean) -> Unit,
+    onPauseDialogEnabledChange: (Boolean) -> Unit,
+    onResumePromptEnabledChange: (Boolean) -> Unit,
     onWeightChange: (String, Int, String) -> Unit,
     onAdjustWeight: (String, Int, Double) -> Unit,
     onRepsChange: (String, Int, String) -> Unit,
@@ -362,7 +366,7 @@ private fun ActiveWorkoutScreen(
         )
     }
 
-    if (state.showExitDialog) {
+    if (state.isPauseDialogEnabled && state.showExitDialog) {
         Dialog(onDismissRequest = onDismissExit) {
             Surface(shape = MaterialTheme.shapes.large) {
                 Column(
@@ -432,8 +436,12 @@ private fun ActiveWorkoutScreen(
         WorkoutOptionsDialog(
             isWorkoutTimerEnabled = state.isWorkoutTimerEnabled,
             isRestTimerEnabled = state.isRestTimerEnabled,
+            isPauseDialogEnabled = state.isPauseDialogEnabled,
+            isResumePromptEnabled = state.isResumePromptEnabled,
             onWorkoutTimerEnabledChange = onWorkoutTimerEnabledChange,
             onRestTimerEnabledChange = onRestTimerEnabledChange,
+            onPauseDialogEnabledChange = onPauseDialogEnabledChange,
+            onResumePromptEnabledChange = onResumePromptEnabledChange,
             onDismiss = onDismissOptions
         )
     }
@@ -1201,8 +1209,12 @@ private fun RestTimerDialog(
 private fun WorkoutOptionsDialog(
     isWorkoutTimerEnabled: Boolean,
     isRestTimerEnabled: Boolean,
+    isPauseDialogEnabled: Boolean,
+    isResumePromptEnabled: Boolean,
     onWorkoutTimerEnabledChange: (Boolean) -> Unit,
     onRestTimerEnabledChange: (Boolean) -> Unit,
+    onPauseDialogEnabledChange: (Boolean) -> Unit,
+    onResumePromptEnabledChange: (Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -1221,6 +1233,18 @@ private fun WorkoutOptionsDialog(
                     description = "Автоматический запуск и напоминания об отдыхе",
                     checked = isRestTimerEnabled,
                     onCheckedChange = onRestTimerEnabledChange
+                )
+                OptionSwitchRow(
+                    title = "Окно 'Тренировка на паузе'",
+                    description = "Показывать окно выбора действий при выходе",
+                    checked = isPauseDialogEnabled,
+                    onCheckedChange = onPauseDialogEnabledChange
+                )
+                OptionSwitchRow(
+                    title = "Диалог возобновления",
+                    description = "Спрашивать, продолжать ли сохранённую тренировку",
+                    checked = isResumePromptEnabled,
+                    onCheckedChange = onResumePromptEnabledChange
                 )
             }
         },
