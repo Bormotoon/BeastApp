@@ -39,6 +39,8 @@ class ActiveWorkoutViewModel(
         private const val FORCE_SET_TOTAL_SETS = 5
         private const val PROGRESSIVE_SET_REST_SECONDS = 90
         private val DEFAULT_PROGRESSIVE_PATTERN = listOf("15", "12", "8", "8", "12", "15")
+        private const val PREF_WORKOUT_TIMER_ENABLED = "pref_workout_timer_enabled"
+        private const val PREF_REST_TIMER_ENABLED = "pref_rest_timer_enabled"
     }
 
     private data class RestTrigger(val seconds: Int, val showDialog: Boolean)
@@ -52,6 +54,7 @@ class ActiveWorkoutViewModel(
     private val programRepository = ProgramRepository(database)
     private val workoutRepository = WorkoutRepository(database)
     private val draftsPrefs = application.getSharedPreferences("workout_drafts", Context.MODE_PRIVATE)
+    private val appPrefs = application.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
     private val gson = Gson()
 
     private val _uiState = MutableStateFlow(ActiveWorkoutUiState(isLoading = true))
@@ -68,6 +71,7 @@ class ActiveWorkoutViewModel(
     }
 
     fun toggleTimer() {
+        if (!_uiState.value.isWorkoutTimerEnabled) return
         _uiState.update { it.copy(isTimerRunning = !it.isTimerRunning) }
         scheduleAutosave()
     }
@@ -78,6 +82,38 @@ class ActiveWorkoutViewModel(
 
     fun cancelFinish() {
         _uiState.update { it.copy(showFinishDialog = false) }
+    }
+
+    fun openOptions() {
+        _uiState.update { it.copy(showOptionsDialog = true) }
+    }
+
+    fun dismissOptions() {
+        _uiState.update { it.copy(showOptionsDialog = false) }
+    }
+
+    fun setWorkoutTimerEnabled(enabled: Boolean) {
+        appPrefs.edit { putBoolean(PREF_WORKOUT_TIMER_ENABLED, enabled) }
+        _uiState.update { state ->
+            val running = if (enabled) state.isTimerRunning else false
+            state.copy(
+                isWorkoutTimerEnabled = enabled,
+                isTimerRunning = running
+            )
+        }
+    }
+
+    fun setRestTimerEnabled(enabled: Boolean) {
+        appPrefs.edit { putBoolean(PREF_REST_TIMER_ENABLED, enabled) }
+        if (!enabled) {
+            restTimerJob?.cancel()
+        }
+        _uiState.update { state ->
+            state.copy(
+                isRestTimerEnabled = enabled,
+                restTimer = if (enabled) state.restTimer else null
+            )
+        }
     }
 
     fun confirmFinish() {
@@ -188,6 +224,7 @@ class ActiveWorkoutViewModel(
     }
 
     fun startRestTimer(totalSeconds: Int = DEFAULT_REST_SECONDS, showDialog: Boolean = true) {
+        if (!_uiState.value.isRestTimerEnabled) return
         restTimerJob?.cancel()
         if (totalSeconds <= 0) {
             _uiState.update { it.copy(restTimer = null) }
@@ -235,6 +272,7 @@ class ActiveWorkoutViewModel(
     }
 
     fun extendRest(extraSeconds: Int = 15) {
+        if (!_uiState.value.isRestTimerEnabled) return
         _uiState.update { state ->
             val timer = state.restTimer ?: return@update state
             state.copy(
@@ -257,6 +295,7 @@ class ActiveWorkoutViewModel(
     }
 
     fun hideRestDialog() {
+        if (!_uiState.value.isRestTimerEnabled) return
         _uiState.update { state ->
             val timer = state.restTimer ?: return@update state
             if (!timer.showDialog) return@update state
@@ -266,6 +305,7 @@ class ActiveWorkoutViewModel(
     }
 
     fun showRestDialog() {
+        if (!_uiState.value.isRestTimerEnabled) return
         _uiState.update { state ->
             val timer = state.restTimer ?: return@update state
             if (timer.showDialog) return@update state
@@ -365,9 +405,11 @@ class ActiveWorkoutViewModel(
         if (markCompleted) {
             val updatedState = _uiState.value
             val restTrigger = computeRestTrigger(updatedState, exerciseId, targetSetNumber, setType)
-            restTrigger?.let { trigger ->
-                val shouldShowDialog = trigger.showDialog
-                startRestTimer(totalSeconds = trigger.seconds, showDialog = shouldShowDialog)
+            if (updatedState.isRestTimerEnabled) {
+                restTrigger?.let { trigger ->
+                    val shouldShowDialog = trigger.showDialog
+                    startRestTimer(totalSeconds = trigger.seconds, showDialog = shouldShowDialog)
+                }
             }
             maybeAutoAdvanceSpecialSet(_uiState.value, exerciseId)
         }
@@ -522,10 +564,10 @@ class ActiveWorkoutViewModel(
             current.copy(
                 exercises = updatedExercises,
                 elapsedSeconds = draft.elapsedSeconds,
-                isTimerRunning = draft.isTimerRunning,
+                isTimerRunning = if (current.isWorkoutTimerEnabled) draft.isTimerRunning else false,
                 currentExerciseIndex = clampedIndex,
                 currentExerciseId = updatedExercises.getOrNull(clampedIndex)?.id,
-                restTimer = rest,
+                restTimer = if (current.isRestTimerEnabled) rest else null,
                 showResumeDialog = false,
                 draftTimestamp = draft.timestamp
             )
@@ -609,6 +651,9 @@ class ActiveWorkoutViewModel(
                 fallback?.name?.let { programRepository.getProgramSummary(it) }
             }
         }
+
+        val isWorkoutTimerEnabled = appPrefs.getBoolean(PREF_WORKOUT_TIMER_ENABLED, false)
+        val isRestTimerEnabled = appPrefs.getBoolean(PREF_REST_TIMER_ENABLED, false)
 
         val latestLog = workoutRepository.getLogsForWorkout(workoutId).firstOrNull()
         val setLogsByExercise: Map<String, List<SetLogEntity>> = if (latestLog != null) {
@@ -714,7 +759,9 @@ class ActiveWorkoutViewModel(
             totalExercises = totalDisplayExercises,
             currentExerciseIndex = initialExerciseIndex,
             currentExerciseId = currentExerciseId,
-            isTimerRunning = true
+            isWorkoutTimerEnabled = isWorkoutTimerEnabled,
+            isRestTimerEnabled = isRestTimerEnabled,
+            isTimerRunning = false
         )
 
         loadDraft(workoutData.workout.id)?.let { draft ->
@@ -899,11 +946,14 @@ data class ActiveWorkoutUiState(
     val currentExerciseIndex: Int = 0,
     val currentExerciseId: String? = null,
     val elapsedSeconds: Int = 0,
-    val isTimerRunning: Boolean = true,
+    val isWorkoutTimerEnabled: Boolean = false,
+    val isRestTimerEnabled: Boolean = false,
+    val isTimerRunning: Boolean = false,
     val restTimer: RestTimerState? = null,
     val showFinishDialog: Boolean = false,
     val showExitDialog: Boolean = false,
     val showResumeDialog: Boolean = false,
+    val showOptionsDialog: Boolean = false,
     val isCompleted: Boolean = false,
     val draftTimestamp: Long? = null,
     val completedResult: ActiveWorkoutResult? = null,

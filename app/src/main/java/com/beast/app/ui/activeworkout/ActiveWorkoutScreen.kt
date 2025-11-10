@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.MilitaryTech
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
@@ -59,6 +60,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -142,6 +144,10 @@ fun ActiveWorkoutRoute(
         onDismissExit = viewModel::cancelExit,
         onResumeDraft = viewModel::resumeDraft,
         onDiscardDraft = viewModel::discardDraftAndRestart,
+        onOpenOptions = viewModel::openOptions,
+        onDismissOptions = viewModel::dismissOptions,
+        onWorkoutTimerEnabledChange = viewModel::setWorkoutTimerEnabled,
+        onRestTimerEnabledChange = viewModel::setRestTimerEnabled,
         onWeightChange = viewModel::updateWeightInput,
         onAdjustWeight = viewModel::adjustWeight,
         onRepsChange = viewModel::updateRepsInput,
@@ -178,6 +184,10 @@ private fun ActiveWorkoutScreen(
     onDismissExit: () -> Unit,
     onResumeDraft: () -> Unit,
     onDiscardDraft: () -> Unit,
+    onOpenOptions: () -> Unit,
+    onDismissOptions: () -> Unit,
+    onWorkoutTimerEnabledChange: (Boolean) -> Unit,
+    onRestTimerEnabledChange: (Boolean) -> Unit,
     onWeightChange: (String, Int, String) -> Unit,
     onAdjustWeight: (String, Int, Double) -> Unit,
     onRepsChange: (String, Int, String) -> Unit,
@@ -214,6 +224,14 @@ private fun ActiveWorkoutScreen(
                         Icon(
                             Icons.AutoMirrored.Outlined.ArrowBack,
                             contentDescription = stringResource(R.string.cd_navigate_back)
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onOpenOptions) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = "Настройки"
                         )
                     }
                 }
@@ -260,6 +278,7 @@ private fun ActiveWorkoutScreen(
                             state = state,
                             currentExercisePosition = currentExercisePosition,
                             onToggleTimer = onToggleTimer,
+                            onOpenOptions = onOpenOptions,
                             onFinishRequest = onFinishRequest
                         )
                     }
@@ -299,13 +318,15 @@ private fun ActiveWorkoutScreen(
                     }
                     item {
                         RestTimerCard(
+                            isEnabled = state.isRestTimerEnabled,
                             restTimer = state.restTimer,
                             recommendedRestSeconds = recommendedRestSeconds,
                             onStartRest = onStartRest,
                             onRestartRest = onRestartRest,
                             onExtendRest = onExtendRest,
                             onSkipRest = onSkipRest,
-                            onShowDialog = onShowRestDialog
+                            onShowDialog = onShowRestDialog,
+                            onOpenOptions = onOpenOptions
                         )
                     }
                     item {
@@ -407,6 +428,16 @@ private fun ActiveWorkoutScreen(
         )
     }
 
+    if (state.showOptionsDialog) {
+        WorkoutOptionsDialog(
+            isWorkoutTimerEnabled = state.isWorkoutTimerEnabled,
+            isRestTimerEnabled = state.isRestTimerEnabled,
+            onWorkoutTimerEnabledChange = onWorkoutTimerEnabledChange,
+            onRestTimerEnabledChange = onRestTimerEnabledChange,
+            onDismiss = onDismissOptions
+        )
+    }
+
     val restTimer = state.restTimer
     if (restTimer?.showDialog == true) {
         RestTimerDialog(
@@ -424,6 +455,7 @@ private fun TopSection(
     state: ActiveWorkoutUiState,
     currentExercisePosition: Int,
     onToggleTimer: () -> Unit,
+    onOpenOptions: () -> Unit,
     onFinishRequest: () -> Unit
 ) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
@@ -482,7 +514,11 @@ private fun TopSection(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Button(onClick = onToggleTimer, modifier = Modifier.weight(1f)) {
+                Button(
+                    onClick = onToggleTimer,
+                    modifier = Modifier.weight(1f),
+                    enabled = state.isWorkoutTimerEnabled
+                ) {
                     Icon(
                         imageVector = if (state.isTimerRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         contentDescription = null
@@ -492,6 +528,16 @@ private fun TopSection(
                 }
                 OutlinedButton(onClick = onFinishRequest, modifier = Modifier.weight(1f)) {
                     Text("Завершить")
+                }
+            }
+            if (!state.isWorkoutTimerEnabled) {
+                Text(
+                    text = "Таймер отключён. Включите в настройках, если он нужен.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                TextButton(onClick = onOpenOptions) {
+                    Text("Открыть настройки")
                 }
             }
         }
@@ -945,13 +991,15 @@ private fun RecordBadge() {
 
 @Composable
 private fun RestTimerCard(
+    isEnabled: Boolean,
     restTimer: RestTimerState?,
     recommendedRestSeconds: Int?,
     onStartRest: (Int?) -> Unit,
     onRestartRest: (Int) -> Unit,
     onExtendRest: (Int) -> Unit,
     onSkipRest: () -> Unit,
-    onShowDialog: () -> Unit
+    onShowDialog: () -> Unit,
+    onOpenOptions: () -> Unit
 ) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -962,7 +1010,16 @@ private fun RestTimerCard(
                 text = "Отдых",
                 style = MaterialTheme.typography.titleMedium
             )
-            if (restTimer == null) {
+            if (!isEnabled) {
+                Text(
+                    text = "Таймер отдыха отключён. Включите в настройках, чтобы запускать напоминания.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(onClick = onOpenOptions) {
+                    Text("Открыть настройки")
+                }
+            } else if (restTimer == null) {
                 val quickOptions = buildList {
                     recommendedRestSeconds?.let { add(it) }
                     addAll(listOf(30, 45, 60, 90))
@@ -1137,6 +1194,65 @@ private fun RestTimerDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WorkoutOptionsDialog(
+    isWorkoutTimerEnabled: Boolean,
+    isRestTimerEnabled: Boolean,
+    onWorkoutTimerEnabledChange: (Boolean) -> Unit,
+    onRestTimerEnabledChange: (Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Настройки тренировки") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                OptionSwitchRow(
+                    title = "Таймер тренировки",
+                    description = "Счётчик времени на экране тренировки",
+                    checked = isWorkoutTimerEnabled,
+                    onCheckedChange = onWorkoutTimerEnabledChange
+                )
+                OptionSwitchRow(
+                    title = "Таймер отдыха",
+                    description = "Автоматический запуск и напоминания об отдыхе",
+                    checked = isRestTimerEnabled,
+                    onCheckedChange = onRestTimerEnabledChange
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Готово")
+            }
+        }
+    )
+}
+
+@Composable
+private fun OptionSwitchRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
