@@ -2,6 +2,7 @@
 
 package com.beast.app.ui.program
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -42,25 +43,46 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.beast.app.R
+import com.beast.app.data.db.ProgramEntity
+import com.beast.app.ui.import.ProgramImportDialog
 
 @Composable
 fun ProgramRoute(
     onBack: () -> Unit,
     onStartWorkout: (String) -> Unit,
     onViewWorkoutDetails: (String) -> Unit,
+    onAddProgram: () -> Unit,
+    onSelectProgram: (String) -> Unit,
     viewModel: ProgramViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var showImportDialog by remember { mutableStateOf(false) }
+
     ProgramScreen(
         state = state,
         onBack = onBack,
         onStartWorkout = onStartWorkout,
         onViewWorkoutDetails = onViewWorkoutDetails,
+        onAddProgram = { showImportDialog = true },
+        onSelectProgram = onSelectProgram,
         onRefresh = viewModel::refresh
     )
+
+    if (showImportDialog) {
+        ProgramImportDialog(
+            onDismiss = { showImportDialog = false },
+            onImportSuccess = {
+                showImportDialog = false
+                viewModel.refresh()
+            }
+        )
+    }
 }
 
 @Composable
@@ -69,34 +91,18 @@ private fun ProgramScreen(
     onBack: () -> Unit,
     onStartWorkout: (String) -> Unit,
     onViewWorkoutDetails: (String) -> Unit,
+    onAddProgram: () -> Unit,
+    onSelectProgram: (String) -> Unit,
     onRefresh: () -> Unit
 ) {
-    var selectedTab by rememberSaveable(state.phases.size) { mutableIntStateOf(0) }
-    LaunchedEffect(state.phases.size) {
-        if (state.phases.isNotEmpty() && selectedTab !in state.phases.indices) {
-            selectedTab = 0
-        }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = state.programName ?: "Программа",
-                            style = MaterialTheme.typography.titleLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (state.programName != null && state.phases.isNotEmpty()) {
-                            Text(
-                                text = "Фаз: ${state.phases.size}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                    Text(
+                        text = "Программы",
+                        style = MaterialTheme.typography.titleLarge
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -139,57 +145,31 @@ private fun ProgramScreen(
                     Button(onClick = onRefresh) { Text("Обновить") }
                 }
             }
-            state.phases.isEmpty() -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Для программы пока нет фаз",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                }
-            }
             else -> {
-                val phases = state.phases
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
                 ) {
-                    ScrollableTabRow(
-                        selectedTabIndex = selectedTab,
-                        edgePadding = 16.dp,
-                        divider = { HorizontalDivider(thickness = 0.dp) }
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        phases.forEachIndexed { index, phase ->
-                            Tab(
-                                selected = selectedTab == index,
-                                onClick = { selectedTab = index },
-                                text = { Text(phase.name) }
+                        items(state.programs) { program ->
+                            ProgramCard(
+                                program = program,
+                                onSelect = { onSelectProgram(program.name) }
                             )
                         }
                     }
-
-                    val selectedPhase = phases.getOrNull(selectedTab)
-                    if (selectedPhase != null) {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            item { PhaseInfoCard(phase = selectedPhase) }
-                            items(selectedPhase.workouts) { workout ->
-                                WorkoutCard(
-                                    workout = workout,
-                                    onStartWorkout = onStartWorkout,
-                                    onViewWorkoutDetails = onViewWorkoutDetails
-                                )
-                            }
-                        }
+                    Button(
+                        onClick = onAddProgram,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text("Добавить программу")
                     }
                 }
             }
@@ -198,21 +178,15 @@ private fun ProgramScreen(
 }
 
 @Composable
-private fun PhaseInfoCard(phase: PhaseUiModel) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(text = phase.name, style = MaterialTheme.typography.titleMedium)
+private fun ProgramCard(
+    program: ProgramEntity,
+    onSelect: () -> Unit
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onSelect)) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(text = program.name, style = MaterialTheme.typography.titleMedium)
             Text(
-                text = "Длительность: ${phase.durationWeeks} нед.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "Тренировок в фазе: ${phase.workoutCount}",
+                text = "Длительность: ${program.durationDays} дней",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

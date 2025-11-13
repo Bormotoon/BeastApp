@@ -24,7 +24,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.beast.app.data.db.DatabaseProvider
-import com.beast.app.diagnostics.OfflineStrictMode
+import com.beast.app.data.repo.ProfileRepository
+import kotlinx.coroutines.launch
 import com.beast.app.ui.activeworkout.ActiveWorkoutResult
 import com.beast.app.ui.activeworkout.ActiveWorkoutRoute
 import com.beast.app.ui.calendar.CalendarRoute
@@ -222,6 +223,23 @@ private fun AppNav(
                 },
                 onViewWorkoutDetails = { workoutId ->
                     navController.navigate("workout/$workoutId") { launchSingleTop = true }
+                },
+                onAddProgram = { /* handled internally */ },
+                onSelectProgram = { programName ->
+                    lifecycleScope.launch {
+                        try {
+                            val db = DatabaseProvider.get(applicationContext)
+                            val profileRepo = ProfileRepository(db)
+                            val currentProfile = profileRepo.getProfile()
+                            if (currentProfile != null) {
+                                val updatedProfile = currentProfile.copy(currentProgramId = programName)
+                                profileRepo.upsertProfile(updatedProfile)
+                            }
+                        } catch (e: Exception) {
+                            // TODO: Handle error
+                        }
+                    }
+                    navController.popBackStack()
                 }
             )
         }

@@ -183,4 +183,8 @@ class ProgramRepository(
     suspend fun getFirstProgram(): ProgramEntity? = withContext(Dispatchers.IO) {
         programDao.getAllPrograms().firstOrNull()
     }
+
+    suspend fun getAllPrograms(): List<ProgramEntity> = withContext(Dispatchers.IO) {
+        programDao.getAllPrograms()
+    }
 }

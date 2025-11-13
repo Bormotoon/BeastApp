@@ -1,35 +1,49 @@
 package com.beast.app.ui.import
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.net.Uri
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.beast.app.data.db.DatabaseProvider
 import com.beast.app.data.repo.ProgramRepository
 import com.beast.app.domain.usecase.ImportProgramUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-sealed interface ImportState {
-    object Idle : ImportState
-    object InProgress : ImportState
-    data class Success(val result: ProgramRepository.ImportResult) : ImportState
-    data class Error(val message: String) : ImportState
+sealed class ImportState {
+    object Idle : ImportState()
+    object InProgress : ImportState()
+    object Success : ImportState()
+    data class Error(val message: String) : ImportState()
 }
 
-class ProgramImportViewModel(
-    private val useCase: ImportProgramUseCase
-) : ViewModel() {
+class ProgramImportViewModel(application: Application) : AndroidViewModel(application) {
+    private val database = DatabaseProvider.get(application.applicationContext)
+    private val programRepository = ProgramRepository(database)
+    private val importProgramUseCase = ImportProgramUseCase(programRepository)
+
     private val _state = MutableStateFlow<ImportState>(ImportState.Idle)
     val state: StateFlow<ImportState> = _state
 
-    fun importFromJson(json: String) {
+    fun importFromUri(uri: Uri) {
+        _state.value = ImportState.InProgress
         viewModelScope.launch {
-            _state.value = ImportState.InProgress
             try {
-                val res = useCase(json)
-                _state.value = ImportState.Success(res)
+                val contentResolver = getApplication<Application>().contentResolver
+                val jsonString = contentResolver.openInputStream(uri)?.use { inputStream ->
+                    inputStream.bufferedReader().use { it.readText() }
+                } ?: throw Exception("Не удалось прочитать файл")
+
+                importProgramUseCase(jsonString)
+                _state.value = ImportState.Success
             } catch (e: Exception) {
-                _state.value = ImportState.Error(e.message ?: "Unknown error")
+                _state.value = ImportState.Error(e.message ?: "Неизвестная ошибка")
             }
         }
+    }
+
+    fun resetState() {
+        _state.value = ImportState.Idle
     }
 }

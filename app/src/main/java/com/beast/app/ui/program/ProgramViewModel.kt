@@ -37,70 +37,18 @@ class ProgramViewModel(application: Application) : AndroidViewModel(application)
     private suspend fun loadData() {
         _uiState.value = ProgramUiState(isLoading = true)
 
-        val app = getApplication<Application>()
-        val prefs = app.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-        val profile = profileRepository.getProfile()
-        val preferredProgram = profile?.currentProgramId ?: prefs.getString("current_program_name", null)
-
-        val overview = when {
-            !preferredProgram.isNullOrBlank() -> programRepository.getProgramPhaseOverview(preferredProgram)
-            else -> {
-                val fallback = programRepository.getFirstProgram()
-                fallback?.name?.let { programRepository.getProgramPhaseOverview(it) }
-            }
-        }
-
-        if (overview == null) {
-            _uiState.value = ProgramUiState(
-                isLoading = false,
-                errorMessage = "Нет доступных программ"
-            )
-            return
-        }
-
-        val allWorkoutIds = overview.phases.flatMap { phase -> phase.workouts.map { it.workout.id } }
-        val latestLogs = workoutRepository.getLatestLogsForWorkouts(allWorkoutIds)
-
-        val zone = ZoneId.systemDefault()
-        val locale = Locale.getDefault()
-        val formatter = DateFormatting.dateFormatter(locale, "yMMMMd")
-
-        val phaseUi = overview.phases.map { phase ->
-            val workouts = phase.workouts.map { workout ->
-                val log = latestLogs[workout.workout.id]
-                val lastCompleted = log?.dateEpochMillis?.let { millis ->
-                    Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
-                }
-                WorkoutUiModel(
-                    id = workout.workout.id,
-                    name = workout.workout.name,
-                    durationMinutes = workout.workout.durationMinutes,
-                    exerciseCount = workout.exerciseCount,
-                    muscleGroups = workout.workout.targetMuscleGroups,
-                    lastCompleted = lastCompleted,
-                    lastCompletedLabel = lastCompleted?.format(formatter)
-                )
-            }
-            PhaseUiModel(
-                name = phase.phase.name,
-                durationWeeks = phase.phase.durationWeeks,
-                workoutCount = workouts.size,
-                workouts = workouts
-            )
-        }
+        val programs = programRepository.getAllPrograms()
 
         _uiState.value = ProgramUiState(
             isLoading = false,
-            programName = overview.program.name,
-            phases = phaseUi
+            programs = programs
         )
     }
 }
 
 data class ProgramUiState(
     val isLoading: Boolean = false,
-    val programName: String? = null,
-    val phases: List<PhaseUiModel> = emptyList(),
+    val programs: List<ProgramEntity> = emptyList(),
     val errorMessage: String? = null
 )
 
