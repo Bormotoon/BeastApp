@@ -100,6 +100,10 @@ class WorkoutRepository private constructor(
         workoutDao.getWorkoutsByIds(workoutIds)
     }
 
+    suspend fun getWorkout(workoutId: String): WorkoutEntity? = withContext(Dispatchers.IO) {
+        workoutDao.getWorkout(workoutId)
+    }
+
     suspend fun getExercisesByIds(exerciseIds: List<String>): List<ExerciseEntity> = withContext(Dispatchers.IO) {
         if (exerciseIds.isEmpty()) return@withContext emptyList()
         workoutDao.getExercisesByIds(exerciseIds)

@@ -56,7 +56,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val title = app.getString(R.string.app_name)
 
         val progressCard = buildProgressCard(todayContext)
-        val todayWorkout = buildTodayWorkoutCard(todayContext)
+        val workoutList = buildWorkoutList(todayContext, summary)
 
         _uiState.value = DashboardUiState(
             isLoading = false,
@@ -67,7 +67,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 profileInitials = initials
             ),
             progressCard = progressCard,
-            todayWorkout = todayWorkout
+            workoutList = workoutList
         )
     }
 
@@ -229,13 +229,45 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             workoutId = workout.workout.id
         )
     }
+
+    private suspend fun buildWorkoutList(context: TodayContext?, summary: ProgramRepository.ProgramSummary?): WorkoutListState {
+        if (context == null || summary == null) return WorkoutListState()
+
+        val schedule = summary.schedule
+        val phaseByWorkout = summary.phaseByWorkout
+
+        val allWorkouts = schedule.mapNotNull { entry ->
+            val workoutId = entry.workoutId ?: return@mapNotNull null
+            val name = workoutRepository.getWorkout(workoutId)?.name ?: "Unknown Workout"
+            val isCompleted = entry.dayNumber < context.dayNumber
+            val isToday = entry.dayNumber == context.dayNumber
+            WorkoutItemState(
+                id = workoutId,
+                name = name,
+                isCompleted = isCompleted,
+                isToday = isToday
+            )
+        }
+
+        val phases = phaseByWorkout.values.distinct().map { phaseName ->
+            val phaseWorkouts = allWorkouts.filter { phaseByWorkout[it.id] == phaseName && !it.isCompleted }
+            PhaseState(name = phaseName, workouts = phaseWorkouts)
+        }.filter { it.workouts.isNotEmpty() }
+
+        val completedWorkouts = allWorkouts.filter { it.isCompleted }
+
+        return WorkoutListState(
+            phases = phases,
+            completedWorkouts = completedWorkouts
+        )
+    }
 }
 
 data class DashboardUiState(
     val isLoading: Boolean = true,
     val topBar: TopBarState = TopBarState(),
     val progressCard: ProgressCardState = ProgressCardState(),
-    val todayWorkout: TodayWorkoutCardState = TodayWorkoutCardState()
+    val workoutList: WorkoutListState = WorkoutListState()
 )
 
 data class TopBarState(
@@ -268,6 +300,23 @@ data class TodayWorkoutCardState(
     val startButtonEnabled: Boolean = false,
     val viewDetailsEnabled: Boolean = false,
     val workoutId: String? = null
+)
+
+data class WorkoutListState(
+    val phases: List<PhaseState> = emptyList(),
+    val completedWorkouts: List<WorkoutItemState> = emptyList()
+)
+
+data class PhaseState(
+    val name: String,
+    val workouts: List<WorkoutItemState>
+)
+
+data class WorkoutItemState(
+    val id: String,
+    val name: String,
+    val isCompleted: Boolean,
+    val isToday: Boolean
 )
 
 enum class WorkoutStatus {

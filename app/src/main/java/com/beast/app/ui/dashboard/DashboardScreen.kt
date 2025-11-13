@@ -2,6 +2,8 @@
 
 package com.beast.app.ui.dashboard
 
+import androidx.compose.runtime.Composable
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,15 +13,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.List
-import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.FitnessCenter
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -34,16 +32,19 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.*
+import androidx.compose.ui.res.*
+import androidx.compose.ui.text.style.*
+import androidx.compose.ui.unit.*
+import androidx.compose.ui.graphics.vector.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Alignment
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.beast.app.R
@@ -60,9 +61,9 @@ fun DashboardRoute(
     onViewWorkoutDetails: (String) -> Unit,
     viewModel: DashboardViewModel = viewModel()
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val state = viewModel.uiState.collectAsStateWithLifecycle()
     DashboardScreen(
-        state = state,
+        state = state.value,
         onNavigateHome = onNavigateHome,
         onOpenCalendar = onOpenCalendar,
         onOpenProgram = onOpenProgram,
@@ -86,7 +87,7 @@ fun DashboardScreen(
     onStartWorkout: (String) -> Unit,
     onViewWorkoutDetails: (String) -> Unit
 ) {
-    var selectedTab by rememberSaveable { mutableStateOf(DashboardNavDestination.HOME) }
+    val selectedTab = rememberSaveable { mutableStateOf(DashboardNavDestination.HOME) }
     Scaffold(
         topBar = {
             DashboardTopBar(
@@ -97,9 +98,9 @@ fun DashboardScreen(
         },
         bottomBar = {
             DashboardBottomBar(
-                selected = selectedTab,
+                selected = selectedTab.value,
                 onSelect = { destination ->
-                    selectedTab = destination
+                    selectedTab.value = destination
                     when (destination) {
                         DashboardNavDestination.HOME -> onNavigateHome()
                         DashboardNavDestination.CALENDAR -> onOpenCalendar()
@@ -124,16 +125,16 @@ fun DashboardScreen(
                 if (state.progressCard.isVisible) {
                     item { ProgressCard(state = state.progressCard) }
                 }
-                if (state.todayWorkout.isVisible) {
+                if (state.workoutList.phases.isNotEmpty() || state.workoutList.completedWorkouts.isNotEmpty()) {
                     item {
-                        TodayWorkoutCard(
-                            state = state.todayWorkout,
+                        WorkoutList(
+                            state = state.workoutList,
                             onStartWorkout = onStartWorkout,
                             onViewWorkoutDetails = onViewWorkoutDetails
                         )
                     }
                 }
-                if (!state.progressCard.isVisible && !state.todayWorkout.isVisible) {
+                if (!state.progressCard.isVisible && state.workoutList.phases.isEmpty() && state.workoutList.completedWorkouts.isEmpty()) {
                     item {
                         Text(
                             text = "Продолжение панели появится скоро",
@@ -149,37 +150,45 @@ fun DashboardScreen(
 
 @Composable
 private fun ProgressCard(state: ProgressCardState) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                text = state.programName,
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = "День ${state.dayNumber} из ${state.totalDays}",
-                style = MaterialTheme.typography.headlineSmall
-            )
-            LinearProgressIndicator(
-                progress = { state.progressFraction },
-                modifier = Modifier.fillMaxWidth()
-            )
-            val phase = state.currentPhaseName
-            val week = state.currentPhaseWeek
-            if (!phase.isNullOrBlank() || week != null) {
+    val expanded = rememberSaveable { mutableStateOf(false) }
+    ElevatedCard(modifier = Modifier.fillMaxWidth().clickable { expanded.value = !expanded.value }) {
+        Column(modifier = Modifier.padding(20.dp).animateContentSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (expanded.value) {
                 Text(
-                    text = buildString {
-                        if (!phase.isNullOrBlank()) {
-                            append("Фаза: ")
-                            append(phase)
-                        }
-                        if (week != null) {
-                            if (!phase.isNullOrBlank()) append(" · ")
-                            append("Неделя ")
-                            append(week)
-                        }
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = state.programName,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = "День ${state.dayNumber} из ${state.totalDays}",
+                    style = MaterialTheme.typography.headlineSmall
+                )
+                LinearProgressIndicator(
+                    progress = { state.progressFraction },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                val phase = state.currentPhaseName
+                val week = state.currentPhaseWeek
+                if (!phase.isNullOrBlank() || week != null) {
+                    Text(
+                        text = buildString {
+                            if (!phase.isNullOrBlank()) {
+                                append("Фаза: ")
+                                append(phase)
+                            }
+                            if (week != null) {
+                                if (!phase.isNullOrBlank()) append(" · ")
+                                append("Неделя ")
+                                append(week)
+                            }
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                LinearProgressIndicator(
+                    progress = { state.progressFraction },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
@@ -276,6 +285,110 @@ private fun TodayWorkoutCard(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Просмотр деталей")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkoutList(
+    state: WorkoutListState,
+    onStartWorkout: (String) -> Unit,
+    onViewWorkoutDetails: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        state.phases.forEach { phase ->
+            PhaseBlock(phase = phase, onStartWorkout = onStartWorkout, onViewWorkoutDetails = onViewWorkoutDetails)
+        }
+        if (state.completedWorkouts.isNotEmpty()) {
+            CompletedWorkoutsBlock(
+                workouts = state.completedWorkouts,
+                onStartWorkout = onStartWorkout,
+                onViewWorkoutDetails = onViewWorkoutDetails
+            )
+        }
+    }
+}
+
+@Composable
+private fun PhaseBlock(
+    phase: PhaseState,
+    onStartWorkout: (String) -> Unit,
+    onViewWorkoutDetails: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = phase.name,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        phase.workouts.forEach { workout ->
+            WorkoutCard(
+                workout = workout,
+                onStartWorkout = onStartWorkout,
+                onViewWorkoutDetails = onViewWorkoutDetails
+            )
+        }
+    }
+}
+
+@Composable
+private fun WorkoutCard(
+    workout: WorkoutItemState,
+    onStartWorkout: (String) -> Unit,
+    onViewWorkoutDetails: (String) -> Unit
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth().clickable { onStartWorkout(workout.id) }) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = workout.name,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
+            if (workout.isToday) {
+                Text(
+                    text = "Сегодня",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            IconButton(onClick = { onViewWorkoutDetails(workout.id) }) {
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = "Детали"
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompletedWorkoutsBlock(
+    workouts: List<WorkoutItemState>,
+    onStartWorkout: (String) -> Unit,
+    onViewWorkoutDetails: (String) -> Unit
+) {
+    val expanded = rememberSaveable { mutableStateOf(false) }
+    Column {
+        Text(
+            text = "Завершённые тренировки (${workouts.size})",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.clickable { expanded.value = !expanded.value },
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (expanded.value) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+                workouts.forEach { workout ->
+                    WorkoutCard(
+                        workout = workout,
+                        onStartWorkout = onStartWorkout,
+                        onViewWorkoutDetails = onViewWorkoutDetails
+                    )
                 }
             }
         }
