@@ -244,6 +244,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             WorkoutItemState(
                 id = workoutId,
                 name = name,
+                dayNumber = entry.dayNumber,
                 isCompleted = isCompleted,
                 isToday = isToday
             )
@@ -256,9 +257,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
         val completedWorkouts = allWorkouts.filter { it.isCompleted }
 
+        val remainingWorkouts = allWorkouts.filter { !it.isCompleted && !it.isToday }.sortedBy { it.dayNumber }
+
         return WorkoutListState(
             phases = phases,
-            completedWorkouts = completedWorkouts
+            completedWorkouts = completedWorkouts,
+            remainingWorkouts = remainingWorkouts
         )
     }
 }
@@ -304,7 +308,8 @@ data class TodayWorkoutCardState(
 
 data class WorkoutListState(
     val phases: List<PhaseState> = emptyList(),
-    val completedWorkouts: List<WorkoutItemState> = emptyList()
+    val completedWorkouts: List<WorkoutItemState> = emptyList(),
+    val remainingWorkouts: List<WorkoutItemState> = emptyList()
 )
 
 data class PhaseState(
@@ -315,6 +320,7 @@ data class PhaseState(
 data class WorkoutItemState(
     val id: String,
     val name: String,
+    val dayNumber: Int,
     val isCompleted: Boolean,
     val isToday: Boolean
 )

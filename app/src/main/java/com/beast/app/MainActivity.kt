@@ -24,9 +24,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.beast.app.data.db.DatabaseProvider
-import com.beast.app.data.repo.ProgramRepository
 import com.beast.app.diagnostics.OfflineStrictMode
-import com.beast.app.domain.usecase.ImportProgramUseCase
 import com.beast.app.ui.activeworkout.ActiveWorkoutResult
 import com.beast.app.ui.activeworkout.ActiveWorkoutRoute
 import com.beast.app.ui.calendar.CalendarRoute
@@ -56,8 +54,6 @@ class MainActivity : FragmentActivity() {
             navigationBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT)
         )
 
-        seedDemoProgramIfFirstRun()
-
         val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
         val onboardingShown = prefs.getBoolean("onboarding_shown", false)
         val programSetupDone = prefs.getBoolean("program_setup_done", false)
@@ -78,26 +74,6 @@ class MainActivity : FragmentActivity() {
                         prefs.edit().putBoolean("program_setup_done", true).apply()
                     }
                 )
-            }
-        }
-    }
-
-    private fun seedDemoProgramIfFirstRun() {
-        val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
-        val seeded = prefs.getBoolean("seed_v1_done", false)
-        if (seeded) return
-
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val json = assets.open("sample_program.json").bufferedReader().use { it.readText() }
-                val db = DatabaseProvider.get(applicationContext)
-                val repo = ProgramRepository(db)
-                val useCase = ImportProgramUseCase(repo)
-                useCase(json)
-                Log.i("BeastApp", "Demo program imported")
-                prefs.edit().putBoolean("seed_v1_done", true).apply()
-            } catch (t: Throwable) {
-                Log.e("BeastApp", "Failed to seed demo program", t)
             }
         }
     }

@@ -136,11 +136,17 @@ fun DashboardScreen(
                 }
                 if (!state.progressCard.isVisible && state.workoutList.phases.isEmpty() && state.workoutList.completedWorkouts.isEmpty()) {
                     item {
-                        Text(
-                            text = "Продолжение панели появится скоро",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Column(modifier = Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = stringResource(id = com.beast.app.R.string.no_program_loaded),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(onClick = { onOpenProgram() }) {
+                                Text(text = stringResource(id = com.beast.app.R.string.import_program_button))
+                            }
+                        }
                     }
                 }
             }
@@ -308,6 +314,13 @@ private fun WorkoutList(
                 onViewWorkoutDetails = onViewWorkoutDetails
             )
         }
+        if (state.remainingWorkouts.isNotEmpty()) {
+            RemainingWorkoutsBlock(
+                workouts = state.remainingWorkouts,
+                onStartWorkout = onStartWorkout,
+                onViewWorkoutDetails = onViewWorkoutDetails
+            )
+        }
     }
 }
 
@@ -391,6 +404,45 @@ private fun CompletedWorkoutsBlock(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun RemainingWorkoutsBlock(
+    workouts: List<WorkoutItemState>,
+    onStartWorkout: (String) -> Unit,
+    onViewWorkoutDetails: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        workouts.forEach { workout ->
+            RemainingWorkoutCard(
+                workout = workout,
+                onStartWorkout = onStartWorkout,
+                onViewWorkoutDetails = onViewWorkoutDetails
+            )
+        }
+    }
+}
+
+@Composable
+private fun RemainingWorkoutCard(
+    workout: WorkoutItemState,
+    onStartWorkout: (String) -> Unit,
+    onViewWorkoutDetails: (String) -> Unit
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth().clickable { onStartWorkout(workout.id) }) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "День ${workout.dayNumber}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = workout.name,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
     }
 }

@@ -45,7 +45,6 @@ import java.util.Locale
 fun ProgramSelectionScreen(onStartProgram: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val selectedProgram = remember { mutableStateOf("huge") }
     val startDate = remember { mutableStateOf(LocalDate.now()) }
     val weightUnit = remember { mutableStateOf("KG") }
 
@@ -77,26 +76,11 @@ fun ProgramSelectionScreen(onStartProgram: () -> Unit) {
             )
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            ProgramCard(
-                modifier = Modifier.weight(1f),
-                title = stringResource(id = com.beast.app.R.string.huge_beast),
-                subtitle = stringResource(id = com.beast.app.R.string.huge_subtitle),
-                selected = selectedProgram.value == "huge",
-                onClick = { selectedProgram.value = "huge" }
-            )
-            ProgramCard(
-                modifier = Modifier.weight(1f),
-                title = stringResource(id = com.beast.app.R.string.lean_beast),
-                subtitle = stringResource(id = com.beast.app.R.string.lean_subtitle),
-                selected = selectedProgram.value == "lean",
-                onClick = { selectedProgram.value = "lean" }
-            )
-        }
+        // No preset programs shown. User can import a program later.
+        Text(
+            text = stringResource(id = com.beast.app.R.string.select_program_subtitle),
+            style = MaterialTheme.typography.bodyLarge
+        )
 
         Button(onClick = {
             showDatePicker(context) { year, month, day ->
@@ -127,19 +111,38 @@ fun ProgramSelectionScreen(onStartProgram: () -> Unit) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        Button(onClick = {
-            saveProgramSelection(context, selectedProgram.value, startDate.value, weightUnit.value)
-            scope.launch(Dispatchers.IO) {
-                persistProfileAndCalendar(
-                    context = context,
-                    programSlug = selectedProgram.value,
-                    startDate = startDate.value,
-                    weightUnit = weightUnit.value
-                )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = {
+                // Start with an empty profile (no program selected)
+                saveProgramSelection(context, "", startDate.value, weightUnit.value)
+                scope.launch(Dispatchers.IO) {
+                    persistProfileAndCalendar(
+                        context = context,
+                        programSlug = "",
+                        startDate = startDate.value,
+                        weightUnit = weightUnit.value
+                    )
+                }
+                onStartProgram()
+            }) {
+                Text(text = stringResource(id = com.beast.app.R.string.start_program_button))
             }
-            onStartProgram()
-        }, modifier = Modifier.fillMaxWidth()) {
-            Text(text = stringResource(id = com.beast.app.R.string.start_program_button))
+
+            Button(onClick = {
+                // TODO: navigate to import screen. For now behave same as start empty.
+                saveProgramSelection(context, "", startDate.value, weightUnit.value)
+                scope.launch(Dispatchers.IO) {
+                    persistProfileAndCalendar(
+                        context = context,
+                        programSlug = "",
+                        startDate = startDate.value,
+                        weightUnit = weightUnit.value
+                    )
+                }
+                onStartProgram()
+            }) {
+                Text(text = stringResource(id = com.beast.app.R.string.start_program_button))
+            }
         }
     }
 }
@@ -216,43 +219,16 @@ private suspend fun persistProfileAndCalendar(
     try {
         val db = DatabaseProvider.get(context.applicationContext)
         val profileRepo = ProfileRepository(db)
-        val programRepo = ProgramRepository(db)
 
-        var resolvedProgramName = when (programSlug) {
-            "huge" -> "Body Beast: Huge Beast"
-            "lean" -> "Body Beast: Lean Beast"
-            else -> programSlug
-        }
-
-        var schedule = runCatching { programRepo.getSchedule(resolvedProgramName) }.getOrDefault(emptyList())
-        if (schedule.isEmpty()) {
-            runCatching { db.programDao().getAllPrograms().firstOrNull() }.
-                getOrNull()?.let { fallback ->
-                    resolvedProgramName = fallback.name
-                    schedule = runCatching { programRepo.getSchedule(resolvedProgramName) }.getOrDefault(emptyList())
-                }
-        }
-
+        // Do not assign or resolve any built-in/demo program here.
+        // Create an empty profile with no current program and leave calendar unset.
         val profile = UserProfileEntity(
             name = "",
             startDateEpochDay = startDate.toEpochDay(),
-            currentProgramId = resolvedProgramName,
+            currentProgramId = "",
             weightUnit = weightUnit
         )
         profileRepo.upsertProfile(profile)
-
-        if (schedule.isNotEmpty()) {
-            val calendarJson = JSONObject()
-            schedule.forEach { entry ->
-                val epochDay = startDate.toEpochDay() + (entry.dayNumber - 1)
-                calendarJson.put(epochDay.toString(), entry.workoutId)
-            }
-            val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-            prefs.edit()
-                .putString("user_calendar", calendarJson.toString())
-                .putString("current_program_name", resolvedProgramName)
-                .apply()
-        }
     } catch (_: Throwable) {
         // TODO: add logging when diagnostics infrastructure is ready
     }

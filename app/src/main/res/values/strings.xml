@@ -4,12 +4,12 @@
 
     <!-- Onboarding / Program selection -->
     <string name="select_program_title">Choose your program</string>
-    <string name="select_program_subtitle">Huge Beast - mass focus\nLean Beast - mass plus cardio</string>
+    <string name="select_program_subtitle">Import a program or start with an empty plan</string>
 
-    <string name="huge_beast">Huge Beast</string>
-    <string name="lean_beast">Lean Beast</string>
-    <string name="huge_subtitle">Mass focus</string>
-    <string name="lean_subtitle">Mass plus cardio</string>
+    <string name="huge_beast">Program A</string>
+    <string name="lean_beast">Program B</string>
+    <string name="huge_subtitle">General program</string>
+    <string name="lean_subtitle">General program</string>
 
     <string name="start_date">Start date: %1$s</string>
 
@@ -17,6 +17,8 @@
     <string name="lbs">lbs</string>
 
     <string name="start_program_button">Start program</string>
+    <string name="no_program_loaded">Программа занятий не загружена</string>
+    <string name="import_program_button">Импортировать программу</string>
 
     <!-- Accessibility content descriptions -->
     <string name="cd_navigate_back">Go back</string>
