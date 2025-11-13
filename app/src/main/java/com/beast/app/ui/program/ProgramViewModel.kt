@@ -1,7 +1,7 @@
 package com.beast.app.ui.program
 
 import android.app.Application
-import android.content.Context
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.beast.app.data.db.DatabaseProvider
@@ -35,22 +35,27 @@ class ProgramViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private suspend fun loadData() {
+        Log.d("ProgramViewModel", "Loading programs...")
         _uiState.value = ProgramUiState(isLoading = true)
 
-        val programs = programRepository.getAllPrograms()
-
-        _uiState.value = ProgramUiState(
-            isLoading = false,
-            programs = programs
-        )
+        try {
+            val programs = programRepository.getAllPrograms()
+            Log.d("ProgramViewModel", "Loaded ${programs.size} programs")
+            _uiState.value = ProgramUiState(
+                isLoading = false,
+                programs = programs,
+                errorMessage = null
+            )
+        } catch (e: Exception) {
+            Log.e("ProgramViewModel", "Error loading programs", e)
+            _uiState.value = ProgramUiState(
+                isLoading = false,
+                programs = emptyList(),
+                errorMessage = e.message ?: "Не удалось загрузить программы"
+            )
+        }
     }
 }
-
-data class ProgramUiState(
-    val isLoading: Boolean = false,
-    val programs: List<ProgramEntity> = emptyList(),
-    val errorMessage: String? = null
-)
 
 data class PhaseUiModel(
     val name: String,

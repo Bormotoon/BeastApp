@@ -16,8 +16,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.fragment.app.FragmentActivity
-import androidx.lifecycle.lifecycleScope
+import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -25,6 +26,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.beast.app.data.db.DatabaseProvider
 import com.beast.app.data.repo.ProfileRepository
+import com.beast.app.diagnostics.OfflineStrictMode
 import kotlinx.coroutines.launch
 import com.beast.app.ui.activeworkout.ActiveWorkoutResult
 import com.beast.app.ui.activeworkout.ActiveWorkoutRoute
@@ -45,7 +47,7 @@ import com.beast.app.ui.workouthistory.WorkoutHistoryRoute
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-class MainActivity : FragmentActivity() {
+class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -87,6 +89,8 @@ private fun AppNav(
     onMarkProgramSetupDone: () -> Unit
 ) {
     val navController = rememberNavController()
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
     NavHost(
         navController = navController,
         startDestination = initialRoute,
@@ -226,9 +230,9 @@ private fun AppNav(
                 },
                 onAddProgram = { /* handled internally */ },
                 onSelectProgram = { programName ->
-                    lifecycleScope.launch {
+                    coroutineScope.launch {
                         try {
-                            val db = DatabaseProvider.get(applicationContext)
+                            val db = DatabaseProvider.get(context)
                             val profileRepo = ProfileRepository(db)
                             val currentProfile = profileRepo.getProfile()
                             if (currentProfile != null) {
